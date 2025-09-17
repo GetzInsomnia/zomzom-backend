@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum PropertyType {
+  CONDO
+  HOUSE
+  LAND
+  COMMERCIAL
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         Role     @default(ADMIN)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  auditLogs    AuditLog[]
+  changeSets   ChangeSet[] @relation("ChangeSetCreatedBy")
+}
+
+model Property {
+  id            String          @id @default(cuid())
+  slug          String          @unique
+  status        PropertyStatus  @default(AVAILABLE)
+  type          PropertyType
+  price         Int
+  area          Float?
+  beds          Int?
+  baths         Int?
+  locationId    String?
+  location      Location?       @relation(fields: [locationId], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  images        PropertyImage[]
+  i18n          PropertyI18N[]
+  reservedUntil DateTime?
+  deposit       Boolean?        @default(false)
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  url        String
+  order      Int      @default(0)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model PropertyI18N {
+  id          String   @id @default(cuid())
+  propertyId  String
+  locale      String
+  title       String
+  description String?
+  amenities   Json?
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model Article {
+  id         String        @id @default(cuid())
+  slug       String        @unique
+  published  Boolean       @default(false)
+  updatedAt  DateTime      @updatedAt
+  i18n       ArticleI18N[]
+}
+
+model ArticleI18N {
+  id        String  @id @default(cuid())
+  articleId String
+  locale    String
+  title     String
+  body      Json
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
+model ChangeSet {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String?
+  patch      Json
+  status     String
+  scheduleAt DateTime?
+  createdBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  jobs       PublishJob[]
+  creator    User     @relation("ChangeSetCreatedBy", fields: [createdBy], references: [id])
+}
+
+model PublishJob {
+  id           String    @id @default(cuid())
+  changesetId  String
+  runAt        DateTime
+  status       String
+  log          String?
+  createdAt    DateTime  @default(now())
+  changeSet    ChangeSet @relation(fields: [changesetId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Rate {
+  code      String  @id
+  value     Float
+  updatedAt DateTime @default(now())
+}
+
+model Location {
+  id         String     @id @default(cuid())
+  province   String
+  district   String?
+  subdistrict String?
+  lat        Float?
+  lng        Float?
+  properties Property[]
+}
