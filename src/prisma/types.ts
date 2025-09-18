@@ -15,10 +15,15 @@ export interface Location {
   lng: number | null;
 }
 
+export interface PropertyImageVariant {
+  url: string;
+}
+
 export interface PropertyImage {
   id: string;
   propertyId: string;
   url: string;
+  variants: Record<'webp' | 'avif', PropertyImageVariant> | null;
   order: number;
 }
 

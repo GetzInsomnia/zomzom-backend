@@ -427,10 +427,16 @@ export class PropertyService {
       const result = [] as { id: string; url: string; order: number }[];
 
       for (const [index, image] of images.entries()) {
+        const variants = {
+          webp: { url: image.variants.webp.url },
+          avif: { url: image.variants.avif.url }
+        };
+
         const created = await tx.propertyImage.create({
           data: {
             propertyId,
             url: image.url,
+            variants,
             order: existingCount + index
           }
         });
