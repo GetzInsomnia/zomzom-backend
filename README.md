@@ -94,7 +94,7 @@ All routes are prefixed with `/v1`. Mutation endpoints require JWT Bearer authen
 - `GET /v1/schedule/jobs` – List publish jobs (ADMIN)
 - `POST /v1/index/rebuild` – Force index rebuild (ADMIN)
 - `POST /v1/backup` – Stream ZIP backup (ADMIN)
-- `GET /v1/suggest?q=` – Lightweight suggestion service
+- `GET /api/suggest?q=` – Lightweight suggestion service sourced from prebuilt data
 
 All mutating operations emit audit log entries.
 
