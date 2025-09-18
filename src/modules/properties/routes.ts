@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate, roleGuard } from '../../common/middlewares/authGuard';
+import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { UploadService } from '../uploads/service';
 import { PropertyService } from './service';
 import {
@@ -25,10 +26,12 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/properties',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR'])] },
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
     async (request, reply) => {
       const body = propertyCreateSchema.parse(request.body);
-      const property = await PropertyService.createProperty(body, request.user!.id);
+      const property = await PropertyService.createProperty(body, request.user!.id, {
+        ipAddress: request.ip
+      });
       reply.code(201);
       return property;
     }
@@ -36,23 +39,27 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.patch(
     '/v1/properties/:id',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR'])] },
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const body = propertyUpdateSchema.parse(request.body);
-      const property = await PropertyService.updateProperty(params.id, body, request.user!.id);
+      const property = await PropertyService.updateProperty(params.id, body, request.user!.id, {
+        ipAddress: request.ip
+      });
       return property;
     }
   );
 
   app.post(
     '/v1/properties/:id/images',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR'])] },
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
     async (request, reply) => {
       const params = propertyIdParamSchema.parse(request.params);
       const files = await UploadService.parseImageRequest(request);
       const processed = await UploadService.processPropertyImages(params.id, files);
-      const images = await PropertyService.addImages(params.id, processed, request.user!.id);
+      const images = await PropertyService.addImages(params.id, processed, request.user!.id, {
+        ipAddress: request.ip
+      });
       reply.code(201);
       return { images };
     }
@@ -60,10 +67,12 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.delete(
     '/v1/properties/:id/images/:imageId',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR'])] },
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
     async (request, reply) => {
       const params = propertyImageParamSchema.parse(request.params);
-      await PropertyService.removeImage(params.id, params.imageId, request.user!.id);
+      await PropertyService.removeImage(params.id, params.imageId, request.user!.id, {
+        ipAddress: request.ip
+      });
       reply.code(204).send();
     }
   );

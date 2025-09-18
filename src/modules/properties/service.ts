@@ -102,7 +102,7 @@ export class PropertyService {
   static async createProperty(
     input: PropertyCreateInput,
     userId: string,
-    options: { skipIndexRebuild?: boolean } = {}
+    options: { skipIndexRebuild?: boolean; ipAddress?: string | null } = {}
   ): Promise<PropertyWithRelations> {
     const property = await prisma.$transaction(async (tx: any) => {
       let locationId = input.locationId ?? null;
@@ -153,7 +153,8 @@ export class PropertyService {
         action: 'property.create',
         entityType: 'Property',
         entityId: created.id,
-        meta: { slug: created.slug }
+        meta: { slug: created.slug },
+        ipAddress: options.ipAddress ?? null
       });
 
       return created as PropertyWithRelations;
@@ -170,7 +171,7 @@ export class PropertyService {
     id: string,
     input: PropertyUpdateInput,
     userId: string,
-    options: { skipIndexRebuild?: boolean } = {}
+    options: { skipIndexRebuild?: boolean; ipAddress?: string | null } = {}
   ): Promise<PropertyWithRelations> {
     const property = await prisma.$transaction(async (tx: any) => {
       const existing = await tx.property.findUnique({
@@ -247,7 +248,8 @@ export class PropertyService {
         action: 'property.update',
         entityType: 'Property',
         entityId: updated.id,
-        meta: { slug: updated.slug }
+        meta: { slug: updated.slug },
+        ipAddress: options.ipAddress ?? null
       });
 
       return updated as PropertyWithRelations;
@@ -260,7 +262,12 @@ export class PropertyService {
     return property;
   }
 
-  static async addImages(propertyId: string, images: ProcessedImage[], userId: string, options: { skipIndexRebuild?: boolean } = {}) {
+  static async addImages(
+    propertyId: string,
+    images: ProcessedImage[],
+    userId: string,
+    options: { skipIndexRebuild?: boolean; ipAddress?: string | null } = {}
+  ) {
     const property = await prisma.property.findUnique({ where: { id: propertyId } });
     if (!property) {
       throw httpError(404, 'Property not found');
@@ -286,7 +293,8 @@ export class PropertyService {
         action: 'property.image.add',
         entityType: 'Property',
         entityId: propertyId,
-        meta: { count: images.length }
+        meta: { count: images.length },
+        ipAddress: options.ipAddress ?? null
       });
 
       return result;
@@ -299,7 +307,12 @@ export class PropertyService {
     return createdImages;
   }
 
-  static async removeImage(propertyId: string, imageId: string, userId: string, options: { skipIndexRebuild?: boolean } = {}) {
+  static async removeImage(
+    propertyId: string,
+    imageId: string,
+    userId: string,
+    options: { skipIndexRebuild?: boolean; ipAddress?: string | null } = {}
+  ) {
     await prisma.$transaction(async (tx: any) => {
       const image = await tx.propertyImage.findFirst({
         where: { id: imageId, propertyId }
@@ -316,7 +329,8 @@ export class PropertyService {
         action: 'property.image.delete',
         entityType: 'Property',
         entityId: propertyId,
-        meta: { imageId }
+        meta: { imageId },
+        ipAddress: options.ipAddress ?? null
       });
     });
 

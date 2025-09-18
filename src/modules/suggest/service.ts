@@ -11,8 +11,7 @@ export class SuggestService {
       prisma.propertyI18N.findMany({
         where: {
           title: {
-            startsWith: normalized,
-            mode: 'insensitive'
+            startsWith: normalized
           }
         },
         include: {
@@ -30,8 +29,7 @@ export class SuggestService {
       prisma.articleI18N.findMany({
         where: {
           title: {
-            startsWith: normalized,
-            mode: 'insensitive'
+            startsWith: normalized
           }
         },
         include: {
@@ -48,8 +46,7 @@ export class SuggestService {
       prisma.location.findMany({
         where: {
           province: {
-            startsWith: normalized,
-            mode: 'insensitive'
+            startsWith: normalized
           }
         },
         take: 3

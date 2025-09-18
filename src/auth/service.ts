@@ -4,29 +4,79 @@ import { prisma } from '../prisma/client';
 import { env } from '../env';
 import { httpError } from '../common/utils/httpErrors';
 import { Role } from '../prisma/types';
+import { createAuditLog } from '../common/utils/audit';
 
 const TOKEN_EXPIRY_SECONDS = 15 * 60; // 15 minutes
+const BCRYPT_SALT_ROUNDS = 10;
 
 export class AuthService {
-  static async login(username: string, password: string) {
-    const user = await prisma.user.findUnique({
+  static async login(username: string, password: string, ipAddress?: string | null) {
+    const logAttempt = async (
+      success: boolean,
+      params: { userId?: string | null; reason?: string }
+    ) => {
+      try {
+        await createAuditLog(prisma, {
+          userId: params.userId ?? null,
+          action: success ? 'auth.login.success' : 'auth.login.failure',
+          entityType: 'Auth',
+          entityId: params.userId ?? null,
+          meta: { username, reason: params.reason ?? null },
+          ipAddress: ipAddress ?? null
+        });
+      } catch (error) {
+        // Logging failures should not block authentication flow
+        console.warn('Failed to record auth attempt', error);
+      }
+    };
+
+    let user = await prisma.user.findUnique({
       where: { username }
     });
 
-    if (!user || !user.isActive) {
+    if (!user) {
+      const userCount = await prisma.user.count();
+      const hasFallbackCreds = Boolean(env.ADMIN_FALLBACK_USERNAME && env.ADMIN_FALLBACK_PASSWORD);
+
+      if (userCount === 0 && hasFallbackCreds) {
+        if (username === env.ADMIN_FALLBACK_USERNAME && password === env.ADMIN_FALLBACK_PASSWORD) {
+          const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+          user = await prisma.user.create({
+            data: {
+              username,
+              passwordHash,
+              role: 'ADMIN',
+              isActive: true
+            }
+          });
+        } else {
+          await logAttempt(false, { reason: 'invalid_fallback_credentials' });
+          throw httpError(401, 'Invalid credentials');
+        }
+      } else {
+        await logAttempt(false, { reason: 'user_not_found' });
+        throw httpError(401, 'Invalid credentials');
+      }
+    }
+
+    const authenticatedUser = user!;
+
+    if (!authenticatedUser.isActive) {
+      await logAttempt(false, { userId: authenticatedUser.id, reason: 'inactive' });
       throw httpError(401, 'Invalid credentials');
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+    const isValid = await bcrypt.compare(password, authenticatedUser.passwordHash);
     if (!isValid) {
+      await logAttempt(false, { userId: authenticatedUser.id, reason: 'invalid_password' });
       throw httpError(401, 'Invalid credentials');
     }
 
     const token = jwt.sign(
       {
-        sub: user.id,
-        role: user.role,
-        username: user.username
+        sub: authenticatedUser.id,
+        role: authenticatedUser.role,
+        username: authenticatedUser.username
       },
       env.JWT_SECRET,
       { expiresIn: TOKEN_EXPIRY_SECONDS }
@@ -36,11 +86,13 @@ export class AuthService {
       token,
       expiresIn: TOKEN_EXPIRY_SECONDS,
       user: {
-        id: user.id,
-        username: user.username,
-        role: user.role as Role
+        id: authenticatedUser.id,
+        username: authenticatedUser.username,
+        role: authenticatedUser.role as Role
       }
     };
+
+    await logAttempt(true, { userId: authenticatedUser.id });
   }
 
   static async getProfile(userId: string) {

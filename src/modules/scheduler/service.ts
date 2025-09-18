@@ -44,7 +44,7 @@ export class SchedulerService {
     });
   }
 
-  static async createSchedule(input: ScheduleCreateInput, userId: string) {
+  static async createSchedule(input: ScheduleCreateInput, userId: string, ipAddress?: string | null) {
     const runAt = input.runAt ?? new Date();
     const normalizedPatch = this.normalizePatch(input);
 
@@ -73,7 +73,8 @@ export class SchedulerService {
         action: 'schedule.create',
         entityType: input.entityType,
         entityId: input.entityId,
-        meta: { changeSetId: changeSet.id, runAt }
+        meta: { changeSetId: changeSet.id, runAt },
+        ipAddress: ipAddress ?? null
       });
 
       return { changeSet, job };

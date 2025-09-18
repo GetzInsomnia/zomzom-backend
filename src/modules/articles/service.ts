@@ -6,6 +6,7 @@ import { ArticleCreateInput, ArticleUpdateInput } from './schemas';
 
 type ArticleServiceOptions = {
   skipIndexRebuild?: boolean;
+  ipAddress?: string | null;
 };
 
 export class ArticleService {
@@ -48,7 +49,8 @@ export class ArticleService {
         action: 'article.create',
         entityType: 'Article',
         entityId: created.id,
-        meta: { slug: created.slug }
+        meta: { slug: created.slug },
+        ipAddress: options.ipAddress ?? null
       });
 
       return created;
@@ -94,7 +96,8 @@ export class ArticleService {
         action: 'article.update',
         entityType: 'Article',
         entityId: id,
-        meta: { slug: updated.slug }
+        meta: { slug: updated.slug },
+        ipAddress: options.ipAddress ?? null
       });
 
       return updated;
