@@ -91,6 +91,7 @@ model PropertyImage {
   id         String   @id @default(cuid())
   propertyId String
   url        String
+  variants   Json?
   order      Int      @default(0)
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 

@@ -7,6 +7,15 @@ import { env } from '../../env';
 import { httpError } from '../../common/utils/httpErrors';
 import { ensureDir, uniqueFilename } from '../../common/utils/file';
 
+export interface ProcessedImageVariant {
+  filename: string;
+  url: string;
+  path: string;
+  width: number;
+  height: number;
+  size: number;
+}
+
 export interface ProcessedImage {
   filename: string;
   url: string;
@@ -14,6 +23,7 @@ export interface ProcessedImage {
   width: number;
   height: number;
   size: number;
+  variants: Record<'webp' | 'avif', ProcessedImageVariant>;
 }
 
 export class UploadService {
@@ -51,39 +61,70 @@ export class UploadService {
 
   static async processPropertyImages(propertyId: string, files: FormidableFile[]): Promise<ProcessedImage[]> {
     const baseUploadDir = path.resolve(env.UPLOAD_DIR);
-    const propertyDir = path.join(baseUploadDir, 'properties', propertyId);
+    const propertyDir = path.join(baseUploadDir, 'processed', 'properties', propertyId);
     await ensureDir(propertyDir);
 
     const processed: ProcessedImage[] = [];
 
     for (const file of files) {
-      const filename = uniqueFilename('.jpg');
-      const destination = path.join(propertyDir, filename);
-      let pipeline = sharp(file.filepath).rotate().resize({ width: 1600, withoutEnlargement: true });
+      const baseName = uniqueFilename('.webp').replace(/\.webp$/, '');
+      const watermarkText = env.WATERMARK_TEXT?.trim();
+      const shouldWatermark = env.WATERMARK_ENABLED && Boolean(watermarkText);
 
-      if (env.WATERMARK_ENABLED) {
-        pipeline = pipeline.composite([
-          {
-            input: Buffer.from(this.createWatermarkSvg(env.WATERMARK_TEXT)),
-            gravity: 'southeast'
-          }
-        ]);
+      const variantConfigs: { format: 'webp' | 'avif'; extension: '.webp' | '.avif'; quality: number }[] = [
+        { format: 'webp', extension: '.webp', quality: 80 },
+        { format: 'avif', extension: '.avif', quality: 50 }
+      ];
+
+      const variants: Record<'webp' | 'avif', ProcessedImageVariant> = {} as Record<
+        'webp' | 'avif',
+        ProcessedImageVariant
+      >;
+
+      for (const config of variantConfigs) {
+        const filename = `${baseName}${config.extension}`;
+        const destination = path.join(propertyDir, filename);
+        let pipeline = sharp(file.filepath)
+          .rotate()
+          .resize({ width: 1600, withoutEnlargement: true, fit: 'inside' });
+
+        if (shouldWatermark) {
+          pipeline = pipeline.composite([
+            {
+              input: Buffer.from(this.createWatermarkSvg(watermarkText!)),
+              gravity: 'southeast'
+            }
+          ]);
+        }
+
+        const { data, info } = await pipeline
+          .toFormat(config.format, { quality: config.quality })
+          .toBuffer({ resolveWithObject: true });
+
+        await fs.writeFile(destination, data);
+
+        variants[config.format] = {
+          filename,
+          url: `/uploads/processed/properties/${propertyId}/${filename}`,
+          path: destination,
+          width: info.width ?? 0,
+          height: info.height ?? 0,
+          size: data.length
+        };
       }
 
-      const { data, info } = await pipeline
-        .jpeg({ quality: 80 })
-        .toBuffer({ resolveWithObject: true });
-
-      await fs.writeFile(destination, data);
       await fs.unlink(file.filepath).catch(() => undefined);
 
+      const primary = variants.webp ?? variants.avif;
+
       processed.push({
-        filename,
-        url: `/uploads/properties/${propertyId}/${filename}`,
-        path: destination,
-        width: info.width ?? 0,
-        height: info.height ?? 0,
-        size: data.length
+        filename: primary.filename,
+        url: primary.url,
+        path: primary.path,
+        width: primary.width,
+        height: primary.height,
+        size: primary.size,
+        variants
       });
     }
 
