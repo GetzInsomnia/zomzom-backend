@@ -1,10 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate, roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
+import { resolvePreviewMode } from '../../common/utils/preview';
 import {
   articleCreateSchema,
   articleIdParamSchema,
   articleSlugParamSchema,
+  articleScheduleTransitionSchema,
   articleUpdateSchema
 } from './schemas';
 import { ArticleService } from './service';
@@ -12,7 +14,8 @@ import { ArticleService } from './service';
 export async function registerArticleRoutes(app: FastifyInstance) {
   app.get('/v1/articles/:slug', async (request) => {
     const params = articleSlugParamSchema.parse(request.params);
-    const article = await ArticleService.getBySlug(params.slug);
+    const { preview } = await resolvePreviewMode(request);
+    const article = await ArticleService.getBySlug(params.slug, { preview });
     return article;
   });
 
@@ -36,6 +39,92 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       const params = articleIdParamSchema.parse(request.params);
       const body = articleUpdateSchema.parse(request.body);
       const article = await ArticleService.updateArticle(params.id, body, request.user!.id, {
+        ipAddress: request.ip
+      });
+      return article;
+    }
+  );
+
+  app.post(
+    '/v1/admin/articles/:id/draft',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = articleIdParamSchema.parse(request.params);
+      const article = await ArticleService.transitionState(params.id, 'DRAFT', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return article;
+    }
+  );
+
+  app.post(
+    '/v1/admin/articles/:id/review',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = articleIdParamSchema.parse(request.params);
+      const article = await ArticleService.transitionState(params.id, 'REVIEW', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return article;
+    }
+  );
+
+  app.post(
+    '/v1/admin/articles/:id/schedule',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = articleIdParamSchema.parse(request.params);
+      const body = articleScheduleTransitionSchema.parse(request.body);
+      const article = await ArticleService.transitionState(params.id, 'SCHEDULED', request.user!.id, {
+        scheduledAt: body.scheduledAt,
+        ipAddress: request.ip
+      });
+      return article;
+    }
+  );
+
+  app.post(
+    '/v1/admin/articles/:id/publish',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = articleIdParamSchema.parse(request.params);
+      const article = await ArticleService.transitionState(params.id, 'PUBLISHED', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return article;
+    }
+  );
+
+  app.post(
+    '/v1/admin/articles/:id/hide',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = articleIdParamSchema.parse(request.params);
+      const article = await ArticleService.transitionState(params.id, 'HIDDEN', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return article;
+    }
+  );
+
+  app.delete(
+    '/v1/admin/articles/:id',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request, reply) => {
+      const params = articleIdParamSchema.parse(request.params);
+      await ArticleService.softDelete(params.id, request.user!.id, {
+        ipAddress: request.ip
+      });
+      reply.code(204).send();
+    }
+  );
+
+  app.post(
+    '/v1/admin/articles/:id/restore',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = articleIdParamSchema.parse(request.params);
+      const article = await ArticleService.restore(params.id, request.user!.id, {
         ipAddress: request.ip
       });
       return article;

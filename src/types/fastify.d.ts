@@ -8,6 +8,7 @@ declare module 'fastify' {
       username: string;
       role: Role;
     };
+    previewMode?: boolean;
     cookies: Record<string, string | undefined>;
   }
 }

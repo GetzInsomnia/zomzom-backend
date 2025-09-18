@@ -4,6 +4,7 @@ export type PropertyFlag = 'FEATURED' | 'HIGHLIGHTED' | 'URGENT';
 
 export type PropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD';
 export type PropertyType = 'CONDO' | 'HOUSE' | 'LAND' | 'COMMERCIAL';
+export type WorkflowState = 'DRAFT' | 'REVIEW' | 'SCHEDULED' | 'PUBLISHED' | 'HIDDEN';
 
 export interface Location {
   id: string;
@@ -42,7 +43,11 @@ export interface Property {
   locationId: string | null;
   reservedUntil: Date | null;
   deposit: boolean;
-  isHidden: boolean;
+  workflowState: WorkflowState;
+  workflowChangedAt: Date;
+  publishedAt: Date | null;
+  scheduledAt: Date | null;
+  hiddenAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -100,7 +105,12 @@ export interface ArticleI18N {
 export interface Article {
   id: string;
   slug: string;
-  published: boolean;
+  workflowState: WorkflowState;
+  workflowChangedAt: Date;
+  publishedAt: Date | null;
+  scheduledAt: Date | null;
+  hiddenAt: Date | null;
+  deletedAt: Date | null;
   updatedAt: Date;
   i18n: ArticleI18N[];
 }

@@ -12,6 +12,12 @@ export class SuggestService {
         where: {
           title: {
             startsWith: normalized
+          },
+          property: {
+            is: {
+              workflowState: 'PUBLISHED',
+              deletedAt: null
+            }
           }
         },
         include: {
@@ -30,14 +36,19 @@ export class SuggestService {
         where: {
           title: {
             startsWith: normalized
+          },
+          article: {
+            is: {
+              workflowState: 'PUBLISHED',
+              deletedAt: null
+            }
           }
         },
         include: {
           article: {
             select: {
               id: true,
-              slug: true,
-              published: true
+              slug: true
             }
           }
         },
@@ -64,7 +75,6 @@ export class SuggestService {
         title: item.title
       })),
       ...articleTitles
-        .filter((item: any) => item.article.published)
         .map((item: any) => ({
           type: 'article',
           id: item.article.id,

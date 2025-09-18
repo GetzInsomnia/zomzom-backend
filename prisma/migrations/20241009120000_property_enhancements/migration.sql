@@ -27,7 +27,11 @@ CREATE TABLE `Property` (
     `updatedAt` DATETIME(3) NOT NULL,
     `reservedUntil` DATETIME(3) NULL,
     `deposit` BOOLEAN NOT NULL DEFAULT false,
-    `isHidden` BOOLEAN NOT NULL DEFAULT false,
+    `workflowState` ENUM('DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'HIDDEN') NOT NULL DEFAULT 'DRAFT',
+    `workflowChangedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `publishedAt` DATETIME(3) NULL,
+    `scheduledAt` DATETIME(3) NULL,
+    `hiddenAt` DATETIME(3) NULL,
     `deletedAt` DATETIME(3) NULL,
 
     UNIQUE INDEX `Property_slug_key`(`slug`),
@@ -65,7 +69,12 @@ CREATE TABLE `PropertyI18N` (
 CREATE TABLE `Article` (
     `id` VARCHAR(191) NOT NULL,
     `slug` VARCHAR(191) NOT NULL,
-    `published` BOOLEAN NOT NULL DEFAULT false,
+    `workflowState` ENUM('DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'HIDDEN') NOT NULL DEFAULT 'DRAFT',
+    `workflowChangedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `publishedAt` DATETIME(3) NULL,
+    `scheduledAt` DATETIME(3) NULL,
+    `hiddenAt` DATETIME(3) NULL,
+    `deletedAt` DATETIME(3) NULL,
     `updatedAt` DATETIME(3) NOT NULL,
 
     UNIQUE INDEX `Article_slug_key`(`slug`),

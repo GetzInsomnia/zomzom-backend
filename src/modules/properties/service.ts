@@ -1,47 +1,55 @@
+import { Prisma, WorkflowState } from '@prisma/client';
 import { prisma } from '../../prisma/client';
 import { createAuditLog } from '../../common/utils/audit';
 import { httpError } from '../../common/utils/httpErrors';
+import { isWithinRetention } from '../../common/utils/preview';
 import { IndexService } from '../index/service';
 import { ProcessedImage } from '../uploads/service';
 import { PaginatedResult, PropertyWithRelations } from './dto';
 import { PropertyCreateInput, PropertyQueryInput, PropertyUpdateInput } from './schemas';
 
-const STATUS_FIELD = 'status';
-const TYPE_FIELD = 'type';
+const SOFT_DELETE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+type PropertyServiceOptions = { preview?: boolean };
 
 export class PropertyService {
-  static async listProperties(filters: PropertyQueryInput): Promise<PaginatedResult<PropertyWithRelations>> {
+  static async listProperties(
+    filters: PropertyQueryInput,
+    options: PropertyServiceOptions = {}
+  ): Promise<PaginatedResult<PropertyWithRelations>> {
     const page = Number(filters.page ?? 1);
     const pageSize = Number(filters.pageSize ?? 20);
     const skip = (page - 1) * pageSize;
 
-    const where: Record<string, unknown> = {};
+    const where: Prisma.PropertyWhereInput = {};
 
     if (filters.status) {
-      where[STATUS_FIELD] = filters.status;
+      where.status = filters.status;
     }
 
     if (filters.type) {
-      where[TYPE_FIELD] = filters.type;
+      where.type = filters.type;
     }
 
     if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
-      where.price = {} as Record<string, number>;
+      const priceFilter: Prisma.IntFilter = {};
       if (filters.priceMin !== undefined) {
-        (where.price as Record<string, number>).gte = filters.priceMin;
+        priceFilter.gte = filters.priceMin;
       }
       if (filters.priceMax !== undefined) {
-        (where.price as Record<string, number>).lte = filters.priceMax;
+        priceFilter.lte = filters.priceMax;
       }
+      where.price = priceFilter;
     }
 
     if (filters.province) {
+      const provinceFilter: any = {
+        contains: filters.province,
+        mode: 'insensitive'
+      };
       where.location = {
         is: {
-          province: {
-            contains: filters.province,
-            mode: 'insensitive'
-          }
+          province: provinceFilter
         }
       };
     }
@@ -53,6 +61,8 @@ export class PropertyService {
     if (filters.baths !== undefined) {
       where.baths = { gte: filters.baths };
     }
+
+    this.applyVisibilityFilters(where, options.preview);
 
     const [data, total] = await Promise.all([
       prisma.property.findMany({
@@ -82,9 +92,12 @@ export class PropertyService {
     };
   }
 
-  static async getProperty(id: string): Promise<PropertyWithRelations> {
-    const property = await prisma.property.findUnique({
-      where: { id },
+  static async getProperty(id: string, options: PropertyServiceOptions = {}): Promise<PropertyWithRelations> {
+    const where: Prisma.PropertyWhereInput = { id };
+    this.applyVisibilityFilters(where, options.preview);
+
+    const property = await prisma.property.findFirst({
+      where,
       include: {
         images: { orderBy: { order: 'asc' } },
         i18n: true,
@@ -120,6 +133,9 @@ export class PropertyService {
         locationId = location.id;
       }
 
+      const workflowState = (input.workflowState as WorkflowState | undefined) ?? 'PUBLISHED';
+      const workflowData = this.buildWorkflowStateData(workflowState);
+
       const created = await tx.property.create({
         data: {
           slug: input.slug,
@@ -132,6 +148,7 @@ export class PropertyService {
           locationId,
           reservedUntil: input.reservedUntil ?? null,
           deposit: input.deposit ?? false,
+          ...workflowData,
           i18n: {
             create: input.i18n.map((entry) => ({
               locale: entry.locale,
@@ -262,6 +279,138 @@ export class PropertyService {
     return property;
   }
 
+  static async transitionState(
+    id: string,
+    target: WorkflowState,
+    userId: string,
+    options: { ipAddress?: string | null; scheduledAt?: Date | null } = {}
+  ): Promise<PropertyWithRelations> {
+    const property = await prisma.$transaction(async (tx: any) => {
+      const existing = await tx.property.findUnique({ where: { id } });
+
+      if (!existing) {
+        throw httpError(404, 'Property not found');
+      }
+
+      const data = this.buildWorkflowStateData(target, { scheduledAt: options.scheduledAt });
+
+      const updated = await tx.property.update({
+        where: { id },
+        data,
+        include: {
+          images: { orderBy: { order: 'asc' } },
+          i18n: true,
+          location: true
+        }
+      });
+
+      await createAuditLog(tx, {
+        userId,
+        action: 'property.workflow.transition',
+        entityType: 'Property',
+        entityId: id,
+        meta: {
+          from: existing.workflowState,
+          to: target,
+          scheduledAt: options.scheduledAt ?? null
+        },
+        ipAddress: options.ipAddress ?? null
+      });
+
+      return updated as PropertyWithRelations;
+    });
+
+    await IndexService.rebuildSafe();
+
+    return property;
+  }
+
+  static async softDelete(
+    id: string,
+    userId: string,
+    options: { ipAddress?: string | null } = {}
+  ): Promise<void> {
+    const deleted = await prisma.$transaction(async (tx: any) => {
+      const existing = await tx.property.findUnique({ where: { id } });
+
+      if (!existing) {
+        throw httpError(404, 'Property not found');
+      }
+
+      await tx.property.update({
+        where: { id },
+        data: {
+          deletedAt: new Date(),
+          workflowState: 'HIDDEN',
+          workflowChangedAt: new Date(),
+          hiddenAt: new Date(),
+          scheduledAt: null
+        }
+      });
+
+      await createAuditLog(tx, {
+        userId,
+        action: 'property.softDelete',
+        entityType: 'Property',
+        entityId: id,
+        meta: { slug: existing.slug },
+        ipAddress: options.ipAddress ?? null
+      });
+
+      return true;
+    });
+
+    if (deleted) {
+      await IndexService.rebuildSafe();
+    }
+  }
+
+  static async restore(
+    id: string,
+    userId: string,
+    options: { ipAddress?: string | null } = {}
+  ): Promise<PropertyWithRelations> {
+    const property = await prisma.$transaction(async (tx: any) => {
+      const existing = await tx.property.findUnique({ where: { id } });
+
+      if (!existing || !existing.deletedAt) {
+        throw httpError(404, 'Property not found');
+      }
+
+      if (!isWithinRetention(existing.deletedAt, SOFT_DELETE_RETENTION_MS)) {
+        throw httpError(410, 'Property can no longer be restored');
+      }
+
+      const restored = await tx.property.update({
+        where: { id },
+        data: {
+          deletedAt: null,
+          ...this.buildWorkflowStateData('DRAFT')
+        },
+        include: {
+          images: { orderBy: { order: 'asc' } },
+          i18n: true,
+          location: true
+        }
+      });
+
+      await createAuditLog(tx, {
+        userId,
+        action: 'property.restore',
+        entityType: 'Property',
+        entityId: id,
+        meta: { slug: restored.slug },
+        ipAddress: options.ipAddress ?? null
+      });
+
+      return restored as PropertyWithRelations;
+    });
+
+    await IndexService.rebuildSafe();
+
+    return property;
+  }
+
   static async addImages(
     propertyId: string,
     images: ProcessedImage[],
@@ -337,5 +486,64 @@ export class PropertyService {
     if (!options.skipIndexRebuild) {
       await IndexService.rebuildSafe();
     }
+  }
+
+  private static buildWorkflowStateData(
+    state: WorkflowState,
+    options: { scheduledAt?: Date | null } = {}
+  ) {
+    const now = new Date();
+    const data: Record<string, any> = {
+      workflowState: state,
+      workflowChangedAt: now
+    };
+
+    switch (state) {
+      case 'PUBLISHED':
+        data.publishedAt = now;
+        data.scheduledAt = null;
+        data.hiddenAt = null;
+        break;
+      case 'SCHEDULED':
+        if (!options.scheduledAt) {
+          throw httpError(400, 'scheduledAt is required for scheduled state');
+        }
+        data.scheduledAt = options.scheduledAt;
+        data.hiddenAt = null;
+        data.publishedAt = null;
+        break;
+      case 'HIDDEN':
+        data.hiddenAt = now;
+        data.scheduledAt = null;
+        break;
+      default:
+        data.scheduledAt = null;
+        data.hiddenAt = null;
+        data.publishedAt = null;
+        break;
+    }
+
+    return data;
+  }
+
+  private static applyVisibilityFilters(where: Prisma.PropertyWhereInput, preview?: boolean) {
+    if (preview) {
+      const retentionCutoff = new Date(Date.now() - SOFT_DELETE_RETENTION_MS);
+      const existingAnd = Array.isArray(where.AND)
+        ? where.AND
+        : where.AND
+          ? [where.AND]
+          : [];
+      where.AND = [
+        ...existingAnd,
+        {
+          OR: [{ deletedAt: null }, { deletedAt: { gte: retentionCutoff } }]
+        }
+      ];
+      return;
+    }
+
+    where.workflowState = 'PUBLISHED';
+    where.deletedAt = null;
   }
 }

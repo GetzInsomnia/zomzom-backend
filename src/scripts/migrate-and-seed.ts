@@ -66,6 +66,9 @@ async function seed() {
           locationId: location.id,
           reservedUntil: Math.random() > 0.8 ? new Date(Date.now() + randomInt(7, 60) * 86_400_000) : null,
           deposit: Math.random() > 0.6,
+          workflowState: 'PUBLISHED',
+          workflowChangedAt: new Date(),
+          publishedAt: new Date(),
           i18n: {
             create: [
               {
@@ -98,10 +101,13 @@ async function seed() {
   const articleCount = await prisma.article.count();
   if (articleCount === 0) {
     for (let i = 0; i < 5; i++) {
+      const isPublished = Math.random() > 0.3;
       await prisma.article.create({
         data: {
           slug: `insight-${i + 1}`,
-          published: Math.random() > 0.3,
+          workflowState: isPublished ? 'PUBLISHED' : 'DRAFT',
+          workflowChangedAt: new Date(),
+          publishedAt: isPublished ? new Date() : null,
           i18n: {
             create: [
               {

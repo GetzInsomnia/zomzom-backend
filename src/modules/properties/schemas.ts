@@ -17,6 +17,7 @@ const propertyI18nSchema = z.object({
 
 const statusEnum = z.enum(['AVAILABLE', 'RESERVED', 'SOLD']);
 const typeEnum = z.enum(['CONDO', 'HOUSE', 'LAND', 'COMMERCIAL']);
+export const workflowStateEnum = z.enum(['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'HIDDEN']);
 
 const nullablePositive = z.union([z.number().positive(), z.null()]);
 const nullableInt = z.union([z.number().int().nonnegative(), z.null()]);
@@ -34,6 +35,7 @@ export const propertyCreateSchema = z
     location: locationSchema.optional(),
     reservedUntil: z.union([z.coerce.date(), z.null()]).optional(),
     deposit: z.boolean().optional(),
+    workflowState: workflowStateEnum.optional(),
     i18n: z.array(propertyI18nSchema).min(1)
   })
   .refine((data) => !(data.location && data.locationId), {
@@ -81,6 +83,11 @@ export const propertyQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20)
 });
 
+export const propertyScheduleTransitionSchema = z.object({
+  scheduledAt: z.coerce.date()
+});
+
 export type PropertyCreateInput = z.infer<typeof propertyCreateSchema>;
 export type PropertyUpdateInput = z.infer<typeof propertyUpdateSchema>;
 export type PropertyQueryInput = z.infer<typeof propertyQuerySchema>;
+export type PropertyScheduleTransitionInput = z.infer<typeof propertyScheduleTransitionSchema>;
