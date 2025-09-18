@@ -10,7 +10,14 @@ datasource db {
 enum Role {
   ADMIN
   EDITOR
-  VIEWER
+  AGENT
+  USER
+}
+
+enum PropertyFlag {
+  FEATURED
+  HIGHLIGHTED
+  URGENT
 }
 
 enum PropertyType {
@@ -27,33 +34,45 @@ enum PropertyStatus {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  username     String   @unique
+  id           String    @id @default(cuid())
+  username     String    @unique
   passwordHash String
-  role         Role     @default(ADMIN)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  role         Role      @default(ADMIN)
+  localePref   String    @default("en")
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
   auditLogs    AuditLog[]
   changeSets   ChangeSet[] @relation("ChangeSetCreatedBy")
+  favorites    Favorite[]
 }
 
 model Property {
-  id            String          @id @default(cuid())
-  slug          String          @unique
-  status        PropertyStatus  @default(AVAILABLE)
-  type          PropertyType
-  price         Int
-  area          Float?
-  beds          Int?
-  baths         Int?
-  locationId    String?
-  location      Location?       @relation(fields: [locationId], references: [id])
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  images        PropertyImage[]
-  i18n          PropertyI18N[]
-  reservedUntil DateTime?
-  deposit       Boolean?        @default(false)
+  id              String                 @id @default(cuid())
+  slug            String                 @unique
+  status          PropertyStatus         @default(AVAILABLE)
+  type            PropertyType
+  price           Int
+  area            Float?
+  beds            Int?
+  baths           Int?
+  locationId      String?
+  location        Location?              @relation(fields: [locationId], references: [id])
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  reservedUntil   DateTime?
+  deposit         Boolean                @default(false)
+  isHidden        Boolean                @default(false)
+  deletedAt       DateTime?
+  images          PropertyImage[]
+  i18n            PropertyI18N[]
+  flags           PropertyFlagOnProperty[]
+  favorites       Favorite[]
+  viewStats       ViewStat[]
+  transitStations PropertyTransitStation[]
+
+  @@index([status, type, price])
+  @@index([status, type, updatedAt])
+  @@index([locationId])
 }
 
 model PropertyImage {
@@ -62,6 +81,8 @@ model PropertyImage {
   url        String
   order      Int      @default(0)
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, order])
 }
 
 model PropertyI18N {
@@ -72,6 +93,8 @@ model PropertyI18N {
   description String?
   amenities   Json?
   property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, locale])
 }
 
 model Article {
@@ -140,4 +163,57 @@ model Location {
   lat        Float?
   lng        Float?
   properties Property[]
+
+  @@index([province])
+}
+
+model PropertyFlagOnProperty {
+  propertyId String
+  flag       PropertyFlag
+  assignedAt DateTime  @default(now())
+  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, flag])
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  propertyId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+}
+
+model ViewStat {
+  id         String   @id @default(cuid())
+  propertyId String
+  bucket     DateTime
+  views      Int      @default(0)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, bucket])
+}
+
+model TransitStation {
+  id          String                    @id @default(cuid())
+  name        String
+  type        String
+  lat         Float?
+  lng         Float?
+  properties  PropertyTransitStation[]
+
+  @@index([type, name])
+}
+
+model PropertyTransitStation {
+  propertyId String
+  stationId  String
+  distance   Int?
+  property   Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  station    TransitStation  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, stationId])
 }
