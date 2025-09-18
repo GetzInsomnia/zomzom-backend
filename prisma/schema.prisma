@@ -140,13 +140,14 @@ model PublishJob {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  userId     String
+  userId     String?
   action     String
   entityType String
   entityId   String?
   meta       Json?
+  ipAddress  String?
   createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Rate {

@@ -7,7 +7,7 @@ import { env } from '../../env';
 import { createAuditLog } from '../../common/utils/audit';
 
 export class BackupService {
-  static async streamBackup(reply: FastifyReply, userId: string) {
+  static async streamBackup(reply: FastifyReply, userId: string, ipAddress?: string | null) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     reply.header('Content-Type', 'application/zip');
     reply.header('Content-Disposition', `attachment; filename=zomzom-backup-${timestamp}.zip`);
@@ -66,7 +66,8 @@ export class BackupService {
       userId,
       action: 'backup.generate',
       entityType: 'Backup',
-      meta: { timestamp }
+      meta: { timestamp },
+      ipAddress: ipAddress ?? null
     });
 
     await archive.finalize();

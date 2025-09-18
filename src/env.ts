@@ -13,6 +13,8 @@ const envSchema = z.object({
   SHADOW_DATABASE_URL: z.string().optional(),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  ADMIN_FALLBACK_USERNAME: z.string().optional(),
+  ADMIN_FALLBACK_PASSWORD: z.string().optional(),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   UPLOAD_DIR: z.string().default('./public/uploads'),
   WATERMARK_ENABLED: z.coerce.boolean().default(true),
