@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate, roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
+import { resolvePreviewMode } from '../../common/utils/preview';
 import { UploadService } from '../uploads/service';
 import { PropertyService } from './service';
 import {
@@ -8,19 +9,22 @@ import {
   propertyIdParamSchema,
   propertyImageParamSchema,
   propertyQuerySchema,
+  propertyScheduleTransitionSchema,
   propertyUpdateSchema
 } from './schemas';
 
 export async function registerPropertyRoutes(app: FastifyInstance) {
   app.get('/v1/properties', async (request) => {
     const filters = propertyQuerySchema.parse(request.query);
-    const result = await PropertyService.listProperties(filters);
+    const { preview } = await resolvePreviewMode(request);
+    const result = await PropertyService.listProperties(filters, { preview });
     return result;
   });
 
   app.get('/v1/properties/:id', async (request) => {
     const params = propertyIdParamSchema.parse(request.params);
-    const property = await PropertyService.getProperty(params.id);
+    const { preview } = await resolvePreviewMode(request);
+    const property = await PropertyService.getProperty(params.id, { preview });
     return property;
   });
 
@@ -74,6 +78,92 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         ipAddress: request.ip
       });
       reply.code(204).send();
+    }
+  );
+
+  app.post(
+    '/v1/admin/properties/:id/draft',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = propertyIdParamSchema.parse(request.params);
+      const property = await PropertyService.transitionState(params.id, 'DRAFT', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return property;
+    }
+  );
+
+  app.post(
+    '/v1/admin/properties/:id/review',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = propertyIdParamSchema.parse(request.params);
+      const property = await PropertyService.transitionState(params.id, 'REVIEW', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return property;
+    }
+  );
+
+  app.post(
+    '/v1/admin/properties/:id/schedule',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = propertyIdParamSchema.parse(request.params);
+      const body = propertyScheduleTransitionSchema.parse(request.body);
+      const property = await PropertyService.transitionState(params.id, 'SCHEDULED', request.user!.id, {
+        scheduledAt: body.scheduledAt,
+        ipAddress: request.ip
+      });
+      return property;
+    }
+  );
+
+  app.post(
+    '/v1/admin/properties/:id/publish',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = propertyIdParamSchema.parse(request.params);
+      const property = await PropertyService.transitionState(params.id, 'PUBLISHED', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return property;
+    }
+  );
+
+  app.post(
+    '/v1/admin/properties/:id/hide',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = propertyIdParamSchema.parse(request.params);
+      const property = await PropertyService.transitionState(params.id, 'HIDDEN', request.user!.id, {
+        ipAddress: request.ip
+      });
+      return property;
+    }
+  );
+
+  app.delete(
+    '/v1/admin/properties/:id',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request, reply) => {
+      const params = propertyIdParamSchema.parse(request.params);
+      await PropertyService.softDelete(params.id, request.user!.id, {
+        ipAddress: request.ip
+      });
+      reply.code(204).send();
+    }
+  );
+
+  app.post(
+    '/v1/admin/properties/:id/restore',
+    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    async (request) => {
+      const params = propertyIdParamSchema.parse(request.params);
+      const property = await PropertyService.restore(params.id, request.user!.id, {
+        ipAddress: request.ip
+      });
+      return property;
     }
   );
 }

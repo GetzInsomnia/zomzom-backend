@@ -20,6 +20,14 @@ enum PropertyFlag {
   URGENT
 }
 
+enum WorkflowState {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  PUBLISHED
+  HIDDEN
+}
+
 enum PropertyType {
   CONDO
   HOUSE
@@ -61,7 +69,11 @@ model Property {
   updatedAt       DateTime               @updatedAt
   reservedUntil   DateTime?
   deposit         Boolean                @default(false)
-  isHidden        Boolean                @default(false)
+  workflowState   WorkflowState          @default(DRAFT)
+  workflowChangedAt DateTime             @default(now())
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  hiddenAt        DateTime?
   deletedAt       DateTime?
   images          PropertyImage[]
   i18n            PropertyI18N[]
@@ -100,7 +112,12 @@ model PropertyI18N {
 model Article {
   id         String        @id @default(cuid())
   slug       String        @unique
-  published  Boolean       @default(false)
+  workflowState WorkflowState @default(DRAFT)
+  workflowChangedAt DateTime  @default(now())
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  hiddenAt   DateTime?
+  deletedAt  DateTime?
   updatedAt  DateTime      @updatedAt
   i18n       ArticleI18N[]
 }

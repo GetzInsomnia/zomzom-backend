@@ -25,6 +25,10 @@ export class SchedulerService {
       }
       this.processing = true;
       try {
+        const released = await this.releaseExpiredReservations();
+        if (released > 0) {
+          app.log.info({ released }, 'Released expired property reservations');
+        }
         await this.processDueJobs(app);
       } finally {
         this.processing = false;
@@ -182,5 +186,48 @@ export class SchedulerService {
     }
 
     throw new Error(`Unsupported entity type: ${changeSet.entityType}`);
+  }
+
+  private static async releaseExpiredReservations() {
+    const now = new Date();
+    const expiredReservations = await prisma.property.findMany({
+      where: {
+        status: 'RESERVED',
+        deposit: false,
+        reservedUntil: {
+          lt: now
+        }
+      },
+      select: { id: true, slug: true }
+    });
+
+    if (expiredReservations.length === 0) {
+      return 0;
+    }
+
+    await prisma.$transaction(async (tx: any) => {
+      for (const property of expiredReservations) {
+        await tx.property.update({
+          where: { id: property.id },
+          data: {
+            status: 'AVAILABLE',
+            reservedUntil: null
+          }
+        });
+
+        await createAuditLog(tx, {
+          userId: null,
+          action: 'property.reservation.release',
+          entityType: 'Property',
+          entityId: property.id,
+          meta: { slug: property.slug, reason: 'reservation expired' },
+          ipAddress: null
+        });
+      }
+    });
+
+    await IndexService.rebuildSafe();
+
+    return expiredReservations.length;
   }
 }

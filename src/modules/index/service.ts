@@ -17,13 +17,20 @@ export class IndexService {
   static async rebuild() {
     const [properties, articles] = await Promise.all([
       prisma.property.findMany({
+        where: {
+          workflowState: 'PUBLISHED',
+          deletedAt: null
+        },
         include: {
           i18n: true,
           location: true
         }
       }),
       prisma.article.findMany({
-        where: { published: true },
+        where: {
+          workflowState: 'PUBLISHED',
+          deletedAt: null
+        },
         include: {
           i18n: true
         }
