@@ -78,7 +78,7 @@ npm run seed         # migrate + seed demo data
 
 ## API overview
 
-All routes are prefixed with `/v1`. Mutation endpoints require JWT Bearer authentication (`Authorization: Bearer <token>`), and additional role checks (`ADMIN`, `EDITOR`, `VIEWER`).
+All routes are prefixed with `/v1`. Mutation endpoints require JWT Bearer authentication (`Authorization: Bearer <token>`), and additional role checks (`ADMIN`, `EDITOR`, `AGENT`, `USER`).
 
 - `POST /v1/auth/login` – Obtain access token
 - `GET /v1/auth/me` – Current user profile

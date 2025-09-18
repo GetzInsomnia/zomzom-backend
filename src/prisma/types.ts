@@ -1,4 +1,6 @@
-export type Role = 'ADMIN' | 'EDITOR' | 'VIEWER';
+export type Role = 'ADMIN' | 'EDITOR' | 'AGENT' | 'USER';
+
+export type PropertyFlag = 'FEATURED' | 'HIGHLIGHTED' | 'URGENT';
 
 export type PropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD';
 export type PropertyType = 'CONDO' | 'HOUSE' | 'LAND' | 'COMMERCIAL';
@@ -39,12 +41,52 @@ export interface Property {
   baths: number | null;
   locationId: string | null;
   reservedUntil: Date | null;
-  deposit: boolean | null;
+  deposit: boolean;
+  isHidden: boolean;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   images: PropertyImage[];
   i18n: PropertyI18N[];
+  flags: PropertyFlagOnProperty[];
+  favorites: Favorite[];
+  viewStats: ViewStat[];
+  transitStations: PropertyTransitStation[];
   location: Location | null;
+}
+
+export interface PropertyFlagOnProperty {
+  propertyId: string;
+  flag: PropertyFlag;
+  assignedAt: Date;
+}
+
+export interface Favorite {
+  id: string;
+  userId: string;
+  propertyId: string;
+  createdAt: Date;
+}
+
+export interface ViewStat {
+  id: string;
+  propertyId: string;
+  bucket: Date;
+  views: number;
+}
+
+export interface TransitStation {
+  id: string;
+  name: string;
+  type: string;
+  lat: number | null;
+  lng: number | null;
+}
+
+export interface PropertyTransitStation {
+  propertyId: string;
+  stationId: string;
+  distance: number | null;
 }
 
 export interface ArticleI18N {
