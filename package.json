@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "migrate": "prisma migrate deploy",
+    "migrate:init": "node scripts/generate-initial-migration.js",
     "seed": "ts-node src/scripts/migrate-and-seed.ts"
   },
   "dependencies": {
