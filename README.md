@@ -11,7 +11,7 @@ Secure API layer for the Zomzom Property platform built with Fastify, Prisma, an
 - **In-process scheduler** that applies queued change sets every 60 seconds and rebuilds the search index after successful execution.
 - **Backup streaming** endpoint producing a ZIP archive with JSON exports and uploaded assets using Archiver.
 - **Suggestion endpoint** for quick “starts with” lookups from property titles, article titles, and locations.
-- **Prisma ORM** with MySQL schema, migrations, and seed script generating demo data (50 properties, 5 articles, base rates, and admin user).
+- **Prisma ORM** with MySQL schema, migrations, and a `prisma/seed.ts` fixture that provisions an `admin`/`admin123` superuser, roughly thirty multilingual showcase properties, and placeholder Unsplash imagery.
 
 ## Getting started
 
@@ -32,14 +32,18 @@ cp .env.example .env
 ### Developer runbook
 
 1. **Boot MySQL** – run `docker compose up -d db` (or point `DATABASE_URL` to your own MySQL 8 instance). When developing migrations locally, also create an empty shadow database and expose it through `SHADOW_DATABASE_URL`.
-2. **Apply migrations** – when pulling an existing branch, execute `npm run migrate` to run `prisma migrate deploy` against the main database. When authoring new schema changes, use `npx prisma migrate dev --name <change>` which consumes both `DATABASE_URL` and `SHADOW_DATABASE_URL`.
-3. **Seed demo content** – `npm run seed` applies migrations and inserts the v6 fixtures (admin user `admin`/`ChangeMe123!`, 50 properties, 5 articles, base FX rate). The script is idempotent and safe to rerun.
+2. **Manage migrations** – Choose the workflow that matches your environment:
+   - **Local iteration (`prisma migrate dev`)** – When prototyping locally, run `npx prisma migrate dev --name <change>` with both `DATABASE_URL` and an empty `SHADOW_DATABASE_URL`. This flow regenerates your dev database and shadow schema so you can iterate quickly.
+   - **Diff + deploy (recommended for Plesk/production)** – Use the helper script `npm run migrate:init` to wrap `prisma migrate diff` and capture SQL migrations under `prisma/migrations/`. Commit the generated folder and apply it in shared environments with `npx prisma migrate deploy` so no shadow database credentials are required.
+3. **Seed demo content** – `npm run seed` executes `prisma/seed.ts`, creating the default `admin`/`admin123` account, seeding roughly thirty multilingual showcase properties, and attaching placeholder imagery/metadata. The script is idempotent and safe to rerun after `npx prisma migrate deploy`.
 4. **Start the API server** – `npm run dev` launches Fastify via `ts-node-dev` with auto-reload. For a production-like run, build once with `npm run build` and serve using `npm run start`.
 
-### Dev (shadow) vs Prod (deploy)
+With a clean database, run the following in order: `npx prisma migrate deploy`, `npm run seed`, `npm run dev`.
 
-- **Local development** – use `prisma migrate dev` to create new migrations or iterate on schema changes. Prisma requires a shadow database for this workflow; supply it via `SHADOW_DATABASE_URL` (for example a secondary schema on your local MySQL). The command resets the shadow database on every run, so never point it at a shared environment.
-- **Deployed environments** – only run `prisma migrate deploy` (surfaced through `npm run migrate` and inside the seeding script) against staging/production. This command executes already-checked-in migrations without needing a shadow database and is safe for zero-downtime deploys.
+### Migration workflows
+
+- **Local development (`prisma migrate dev`)** – Optional for developers who want the full Prisma workflow. Provide `SHADOW_DATABASE_URL` for the throwaway schema Prisma creates, and keep it scoped to local resources because the shadow database is dropped/recreated on each run.
+- **Diff + deploy for shared environments** – Use `npm run migrate:init` to generate SQL via `prisma migrate diff` and commit the resulting folder in `prisma/migrations/`. When promoting to staging, Plesk, or production, run `npx prisma migrate deploy` to apply the checked-in SQL without requiring a shadow database.
 
 ## Environment variables
 
