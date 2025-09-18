@@ -93,7 +93,7 @@ All routes are prefixed with `/v1`. Mutation endpoints require JWT Bearer authen
 - `POST /v1/schedule` – Queue change set (ADMIN)
 - `GET /v1/schedule/jobs` – List publish jobs (ADMIN)
 - `POST /v1/index/rebuild` – Force index rebuild (ADMIN)
-- `POST /v1/backup` – Stream ZIP backup (ADMIN)
+- `GET /api/admin/backup` – Stream ZIP backup (ADMIN)
 - `GET /api/suggest?q=` – Lightweight suggestion service sourced from prebuilt data
 
 All mutating operations emit audit log entries.
@@ -108,7 +108,7 @@ All mutating operations emit audit log entries.
 
 ## Backups
 
-`POST /v1/backup` streams a ZIP archive that contains JSON exports for properties, articles, users, locations, rates, change sets, publish jobs, audit logs, plus the entire upload directory if present.
+`GET /api/admin/backup` streams a ZIP archive that contains JSON exports for properties, articles, users, locations, rates, change sets, publish jobs, audit logs, the MiniSearch index directory, an optional SQLite dev database (if present at `prisma/dev.db` or defined via `file:` `DATABASE_URL`), and uploads from the last 30 days. Older uploads are skipped to keep the archive manageable; the audit log metadata records how many recent files were included.
 
 ## Deployment (Plesk)
 
