@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:8
+    container_name: zomzom_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: zomzom
+      MYSQL_USER: zomzom
+      MYSQL_PASSWORD: zomzompass
+    ports:
+      - "3307:3306"   # expose local 3307 → container 3306
+    volumes:
+      - dbdata:/var/lib/mysql
+volumes:
+  dbdata:
