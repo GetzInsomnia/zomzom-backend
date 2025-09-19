@@ -4,7 +4,7 @@
 
 ## File type counts (top 20)
 - `.ts`: 42
-- `.md`: 14
+- `.md`: 17
 - `(noext)`: 6
 - `.json`: 6
 - `.js`: 2
@@ -34,14 +34,17 @@
 │     ├─ ADMIN.md
 │     ├─ API_WIRING.md
 │     ├─ BUILD.json
+│     ├─ CHECKLIST.md
 │     ├─ CHECKS.md
 │     ├─ ENV.md
+│     ├─ FASTIFY_AUGMENTATION.md
 │     ├─ FASTIFY_TYPES.md
 │     ├─ I18N.md
 │     ├─ INVENTORY.md
 │     ├─ PERFORMANCE.md
 │     ├─ PRISMA_STATE.md
 │     ├─ PRISMA.md
+│     ├─ ROUTE_GUARDS.md
 │     ├─ ROUTES.md
 │     ├─ SECURITY.md
 │     └─ SEO.md
@@ -67,7 +70,8 @@
 │  │     ├─ audit.ts
 │  │     ├─ file.ts
 │  │     ├─ httpErrors.ts
-│  │     └─ preview.ts
+│  │     ├─ preview.ts
+│  │     └─ requestUser.ts
 │  ├─ modules
 │  │  ├─ articles
 │  │  │  ├─ routes.ts
@@ -101,8 +105,6 @@
 │  │  ├─ seed.light.ts
 │  │  └─ types.ts
 │  ├─ t
-│  ├─ types
-│  │  └─ fastify.d.ts
 │  ├─ env.ts
 │  ├─ global.d.ts
 │  └─ server.ts

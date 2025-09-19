@@ -1,3 +1,4 @@
+// src/server.ts
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -5,6 +6,7 @@ import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 
 import { env } from './env';
+import { prisma } from './prisma/client';
 import { errorHandler } from './common/middlewares/errorHandler';
 
 // plugins/routes
@@ -32,18 +34,24 @@ async function bootstrap() {
     allowedOrigins.push('http://localhost:3000');
   }
 
-  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(
+    helmet,
+    // dev: ปิด CSP เพื่อความสะดวก; prod: เปิด CSP
+    { contentSecurityPolicy: env.NODE_ENV === 'production' }
+  );
+
   await app.register(cookie);
+
   await app.register(rateLimit, {
     max: env.RATE_LIMIT_MAX,
     timeWindow: env.RATE_LIMIT_WINDOW * 1000,
     hook: 'onRequest'
   });
+
   await app.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) cb(null, true);
-      else cb(null, false);
+      cb(null, allowedOrigins.includes(origin));
     },
     credentials: true
   });
@@ -51,13 +59,25 @@ async function bootstrap() {
   // global error handler
   app.setErrorHandler(errorHandler);
 
-  // ✅ register JWT plugin BEFORE routes
+  // register JWT plugin BEFORE routes
   await app.register(jwtPlugin);
 
-  // health
+  // liveness
   app.get('/health', async () => ({ ok: true, time: new Date().toISOString() }));
 
-  // ✅ register route plugins (อย่าเรียกเป็นฟังก์ชันเอง)
+  // readiness (ตี DB จริง)
+  app.get('/ready', async (req, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { ok: true, db: 'up', time: new Date().toISOString() };
+    } catch (err) {
+      req.log.error({ err }, 'readiness failed');
+      reply.code(503);
+      return { ok: false, db: 'down' };
+    }
+  });
+
+  // routes
   await app.register(registerAuthRoutes);
   await app.register(registerPropertyRoutes);
   await app.register(registerArticleRoutes);
@@ -66,9 +86,18 @@ async function bootstrap() {
   await app.register(registerIndexRoutes);
   await app.register(registerSuggestRoutes);
 
+  // background jobs
   SchedulerService.start(app);
 
+  // graceful DB handling
+  app.addHook('onClose', async () => {
+    await prisma.$disconnect();
+  });
+
   try {
+    // connect DB ก่อนเปิดพอร์ต
+    await prisma.$connect();
+
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
     app.log.info(`Server listening on port ${env.PORT}`);
   } catch (error) {

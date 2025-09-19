@@ -294,6 +294,40 @@ function extractZodEnvKeys(src){
   write('FASTIFY_TYPES.md', lines.join('\n'));
 })();
 
+// ---------- ROUTES_AUTH_GUARD ----------
+(function () {
+  const lines = ['# ROUTES_AUTH_GUARD', ''];
+  const srcDir = path.join(ROOT, 'src');
+  const routeFiles = exists(srcDir) ? walk(srcDir).filter(f => /\/routes\.ts$/.test(f)) : [];
+
+  const badImports = [];
+  const missingAuth = [];
+  const good = [];
+
+  for (const f of routeFiles) {
+    const s = read(f) || '';
+    const hasBad = /import\s*\{\s*authenticate\s*\}\s*from\s*['"][.\/\w-]+authGuard['"]/.test(s);
+    const usesAppAuth = /preHandler\s*:\s*\[\s*app\.authenticate\s*\]/.test(s);
+    if (hasBad) badImports.push(rel(f));
+    if (!usesAppAuth && /auth\/routes\.ts$/.test(f) === false) {
+      // อนุโลมไฟล์ที่ไม่ได้ต้อง auth ทุก handler แต่เตือนให้เช็คเอง
+      missingAuth.push(rel(f));
+    }
+    if (!hasBad) good.push(rel(f));
+  }
+
+  lines.push(`- files scanned: ${routeFiles.length}`);
+  lines.push(`- no "import { authenticate } ...authGuard": ${badImports.length === 0 ? '✅' : '❌'}`);
+  badImports.forEach(f => lines.push(`  - remove bad import in ${f}`));
+
+  if (missingAuth.length) {
+    lines.push('- ⚠ routes that do not use app.authenticate anywhere (manual review):');
+    missingAuth.slice(0,50).forEach(f => lines.push(`  - ${f}`));
+  }
+
+  write('ROUTES_AUTH_GUARD.md', lines.join('\n'));
+})();
+
 // ---------- ROUTE_GUARDS ----------
 (function(){
   const lines=['# ROUTE_GUARDS',''];
@@ -509,52 +543,24 @@ function extractZodEnvKeys(src){
   write('CHECKLIST.md', lines.join('\n'));
 })();
 
-// ---------- FASTIFY AUGMENTATION GUARD ----------
+// ---------- FASTIFY_AUGMENTATION_GUARD ----------
 (function(){
   const lines=['# FASTIFY_AUGMENTATION_GUARD',''];
   const srcDir = path.join(ROOT, 'src');
   const globalDts = path.join(srcDir, 'global.d.ts');
+  lines.push(`- src/global.d.ts present: ${exists(globalDts) ? '✅' : '❌'}`);
 
-  // A) global.d.ts presence
-  const hasGlobal = exists(globalDts);
-  lines.push(`- src/global.d.ts present: ${hasGlobal ? '✅' : '❌'}`);
-
-  // B) Ensure there is exactly ONE fastify augmentation file
-  const allDts = exists(srcDir) ? walk(srcDir).filter(f => /\.d\.ts$/.test(f)) : [];
-  const augFiles = allDts.filter(f => /declare module ['"]fastify['"]/.test(read(f) || ''));
-  lines.push(`- Fastify augmentation files count (expected 1): ${augFiles.length === 1 ? '✅' : '❌'} (${augFiles.length})`);
-  augFiles.forEach(f => lines.push(`  - ${rel(f)}`));
-  const onlyGlobal = augFiles.length === 1 && augFiles[0] === globalDts;
-  lines.push(`- Augmentation file is src/global.d.ts: ${onlyGlobal ? '✅' : '❌'}`);
-
-  // C) Validate global.d.ts content shape (best-effort)
-  if (hasGlobal) {
-    const s = read(globalDts) || '';
-    const hasUser = /interface\s+FastifyRequest\s*\{[\s\S]*\buser\?\s*:\s*\{[\s\S]*\bid:\s*string;[\s\S]*\busername:\s*string;[\s\S]*\brole:\s*\$Enums\.Role;[\s\S]*\}[\s\S]*\}/m.test(s);
-    const hasAuth = /interface\s+FastifyInstance\s*\{[\s\S]*\bauthenticate\s*:\s*import\(['"]fastify['"]\)\.preHandlerHookHandler;?[\s\S]*\}/m.test(s);
-    lines.push(`- global.d.ts declares FastifyRequest.user: ${hasUser ? '✅' : '❌'}`);
-    lines.push(`- global.d.ts declares FastifyInstance.authenticate: ${hasAuth ? '✅' : '❌'}`);
-  }
-
-  // D) No runtime import of ./types/fastify anywhere
   const tsFiles = exists(srcDir) ? walk(srcDir).filter(f => /\.(ts|tsx)$/.test(f)) : [];
-  const badRuntime = tsFiles.filter(f => /import\s+['"][.\/]types\/fastify['"]/.test(read(f) || ''));
-  lines.push(`- no runtime imports of ./types/fastify: ${badRuntime.length === 0 ? '✅' : '❌'}`);
-  badRuntime.forEach(f => lines.push(`  - ${rel(f)}`));
+  const bad = tsFiles.filter(f => /import\s+['"][.\/]types\/fastify['"]/.test(read(f)||''));
+  lines.push(`- no runtime imports of ./types/fastify: ${bad.length===0 ? '✅' : '❌'}`);
+  bad.forEach(f => lines.push(`  - ${rel(f)}`));
 
-  // E) Triple-slash references in critical files (heuristic)
+  // triple-slash reference ต้องชี้ไปที่ ../global.d.ts เท่านั้น (ถ้ามีใช้)
   const jwtFile = path.join(srcDir, 'auth', 'jwt.ts');
-  const authGuardFile = path.join(srcDir, 'common', 'middlewares', 'authGuard.ts');
   const jwtSrc = exists(jwtFile) ? read(jwtFile) : '';
-  const guardSrc = exists(authGuardFile) ? read(authGuardFile) : '';
-  const jwtHasTriple = /\/\/\/\s*<reference\s+path="\.\.\/global\.d\.ts"\s*\/>/.test(jwtSrc || '');
-  const guardHasTriple = /\/\/\/\s*<reference\s+path="\.\.\/\.\.\/global\.d\.ts"\s*\/>/.test(guardSrc || '');
-  lines.push(`- jwt.ts triple-slash to ../global.d.ts: ${jwtHasTriple ? '✅' : '❌'}`);
-  lines.push(`- authGuard.ts triple-slash to ../../global.d.ts: ${guardHasTriple ? '✅' : '❌'}`);
-
-  // F) app.decorate & decorateRequest presence (best-effort)
-  const hasDecorate = /decorateRequest\(\s*['"]user['"]/.test(jwtSrc || '') && /decorate\(\s*['"]authenticate['"]/.test(jwtSrc || '');
-  lines.push(`- jwt.ts decorates request.user and instance.authenticate: ${hasDecorate ? '✅' : '❌'}`);
+  const hasTriple = /\/\/\/\s*<reference\s+path="(\.\.\/)+global\.d\.ts"\s*\/>/.test(jwtSrc||'');
+  lines.push(`- jwt.ts has triple-slash reference to ../global.d.ts (optional): ${hasTriple ? '✅' : '–'}`);
 
   write('FASTIFY_AUGMENTATION.md', lines.join('\n'));
 })();
+

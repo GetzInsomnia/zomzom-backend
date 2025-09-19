@@ -2,4 +2,4 @@
 
 - src/global.d.ts present: ✅
 - no runtime imports of ./types/fastify: ✅
-- jwt.ts has triple-slash reference: ✅
+- jwt.ts has triple-slash reference to ../global.d.ts (optional): ✅
