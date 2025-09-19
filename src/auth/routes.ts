@@ -5,6 +5,7 @@ import { loginSchema } from './schemas';
 import { AuthService } from './service';
 import {
   REFRESH_COOKIE_NAME,
+  clearRefreshCookie,
   setRefreshCookie,
   signAccessToken,
   signRefreshToken,
@@ -59,7 +60,16 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     if (!(await guard(request, reply))) {
       return;
     }
-    reply.clearCookie('token', { path: '/' });
+    if (!request.user) {
+      return reply.code(401).send({ error: 'UNAUTHORIZED' });
+    }
+
+    await prisma.user.update({
+      where: { id: request.user.id },
+      data: { tokenVersion: { increment: 1 } }
+    });
+
+    clearRefreshCookie(reply);
     return { ok: true };
   });
 
