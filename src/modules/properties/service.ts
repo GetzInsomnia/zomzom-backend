@@ -6,8 +6,9 @@ import { IndexService } from '../index/service';
 import { ProcessedImage } from '../uploads/service';
 import { PaginatedResult, PropertyWithRelations } from './dto';
 import { PropertyCreateInput, PropertyUpdateInput } from './schemas';
-import { PropertyFilters, resolvePriceRange } from '../../catalog/filters.schema';
+import { AMENITIES, PropertyFilters, resolvePriceRange } from '../../catalog/filters.schema';
 import { WorkflowState } from '../../prisma/types';
+import { TRANSIT_STATIONS } from '../../catalog/transit';
 
 type PropertyWhere = Record<string, any>;
 type IntFilter = { gte?: number; lte?: number };
@@ -41,28 +42,120 @@ export class PropertyService {
       where.type = filters.type;
     }
 
-    if (filters.priceRange) {
-      const range = resolvePriceRange(filters.priceRange);
+    const priceFilter: IntFilter = {};
+    if (filters.priceBin) {
+      const range = resolvePriceRange(filters.priceBin);
       if (range) {
-        const priceFilter: IntFilter = { gte: range.min };
+        priceFilter.gte = range.min;
         if (range.max !== undefined) {
           priceFilter.lte = range.max;
         }
-        where.price = priceFilter;
+      }
+    } else {
+      if (filters.priceMin !== undefined) {
+        priceFilter.gte = filters.priceMin;
+      }
+      if (filters.priceMax !== undefined) {
+        priceFilter.lte = filters.priceMax;
       }
     }
 
-    if (filters.secondaryTags && filters.secondaryTags.length > 0) {
-      where.flags = {
-        some: {
-          flag: {
-            in: filters.secondaryTags
+    if (Object.keys(priceFilter).length > 0) {
+      where.price = priceFilter;
+    }
+
+    if (filters.furnished) {
+      const furnishedMap: Record<NonNullable<PropertyFilters['furnished']>, boolean | null> = {
+        NONE: false,
+        FULL: true,
+        PARTIAL: null
+      };
+      const furnishedValue = furnishedMap[filters.furnished];
+      if (furnishedValue !== undefined) {
+        where.furnished = furnishedValue;
+      }
+    }
+
+    const andConditions: PropertyWhere[] = [];
+
+    if (filters.q) {
+      const query = filters.q.trim();
+      if (query.length > 0) {
+        andConditions.push({
+          OR: [
+            { slug: { contains: query, mode: 'insensitive' } },
+            {
+              i18n: {
+                some: {
+                  title: {
+                    contains: query,
+                    mode: 'insensitive'
+                  }
+                }
+              }
+            }
+          ]
+        });
+      }
+    }
+
+    if (filters.tags && filters.tags.length > 0) {
+      for (const flag of filters.tags) {
+        andConditions.push({ flags: { some: { flag } } });
+      }
+    }
+
+    if (filters.amenities && filters.amenities.length > 0) {
+      const validAmenities = new Set(AMENITIES);
+      for (const amenity of filters.amenities) {
+        if (!validAmenities.has(amenity)) continue;
+        andConditions.push({
+          i18n: {
+            some: {
+              amenities: {
+                path: [amenity],
+                equals: true
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (filters.nearTransitStation) {
+      andConditions.push({
+        transitStations: { some: { stationId: filters.nearTransitStation } }
+      });
+    }
+
+    if (filters.nearTransitLine) {
+      const stationIds = TRANSIT_STATIONS.filter(
+        (station) => station.lineId === filters.nearTransitLine
+      ).map((station) => station.id);
+
+      andConditions.push({
+        transitStations: {
+          some: {
+            stationId: {
+              in: stationIds
+            }
           }
         }
-      };
+      });
+    }
+
+    if (andConditions.length > 0) {
+      const existingAnd = Array.isArray(where.AND)
+        ? where.AND
+        : where.AND
+          ? [where.AND]
+          : [];
+      where.AND = [...existingAnd, ...andConditions];
     }
 
     this.applyVisibilityFilters(where, options.preview);
+
+    const orderBy = this.resolveOrdering(filters.orderBy);
 
     const [data, total] = await Promise.all([
       prisma.property.findMany({
@@ -72,7 +165,7 @@ export class PropertyService {
           i18n: true,
           location: true
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: pageSize
       }) as Promise<PropertyWithRelations[]>,
@@ -568,5 +661,22 @@ export class PropertyService {
     where.workflowState = 'PUBLISHED';
     where.deletedAt = null;
     where.isHidden = false;
+  }
+
+  private static resolveOrdering(orderBy?: PropertyFilters['orderBy']): any[] {
+    switch (orderBy) {
+      case 'PRICE_ASC':
+        return [{ price: 'asc' }, { updatedAt: 'desc' }];
+      case 'PRICE_DESC':
+        return [{ price: 'desc' }, { updatedAt: 'desc' }];
+      case 'VIEWS_DESC':
+        return [
+          { viewStats: { _sum: { views: 'desc' } } },
+          { updatedAt: 'desc' }
+        ];
+      case 'UPDATED_DESC':
+      default:
+        return [{ updatedAt: 'desc' }];
+    }
   }
 }
