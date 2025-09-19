@@ -5,14 +5,14 @@ import jwt from 'jsonwebtoken';
 import { env } from '../env';
 
 type JwtPayload = {
-  id?: string;
   sub?: string;
+  id?: string;
   username?: string;
-  role?: 'ADMIN' | 'USER';
+  role?: 'ADMIN' | 'USER' | string;
 };
 
 export default fp(async function jwtPlugin(app: FastifyInstance) {
-  // ให้แน่ใจว่ามี field user บน request
+  // ให้มี field user บน request (runtime)
   app.decorateRequest('user', null);
 
   app.addHook('onRequest', async (request) => {
@@ -28,7 +28,7 @@ export default fp(async function jwtPlugin(app: FastifyInstance) {
         role: payload.role === 'ADMIN' ? 'ADMIN' : 'USER'
       };
     } catch {
-      // ถ้า verify ไม่ผ่าน ปล่อยเป็น anonymous
+      // ปล่อยผ่านเป็น anonymous
       request.user = undefined;
     }
   });
