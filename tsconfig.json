@@ -10,12 +10,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
   "include": [
-    "src"
+    "src",
+    "src/types/**/*.d.ts",
+    "prisma/**/*.ts"
   ],
   "exclude": [
     "node_modules",

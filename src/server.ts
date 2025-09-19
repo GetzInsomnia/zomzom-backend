@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import jwtPlugin from './auth/jwt';
 
 import { env } from './env';
 import { errorHandler } from './common/middlewares/errorHandler';
@@ -52,6 +53,7 @@ export async function createServer() {
     },
     credentials: true,
   });
+  await app.register(jwtPlugin);
 
   // Error handler กลาง
   app.setErrorHandler(errorHandler);
