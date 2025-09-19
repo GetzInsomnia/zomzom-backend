@@ -22,6 +22,11 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_WINDOW: z.coerce.number().int().positive().default(15 * 60), // seconds
   INDEX_DIR: z.string().default('./public/data/index'),
+  ACCESS_TOKEN_EXPIRES: z.union([z.coerce.number(), z.string()]).default('15m'),
+  REFRESH_TOKEN_EXPIRES: z.union([z.coerce.number(), z.string()]).default('7d'),
+  REFRESH_TOKEN_SECRET: z.string().min(32, 'REFRESH_TOKEN_SECRET must be at least 32 characters'),
+  COOKIE_SECURE: z.coerce.boolean().default(false),
+  COOKIE_DOMAIN: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);
