@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { clearCsrfCookie, issueCsrfToken } from '../common/middlewares/csrf';
 import { loginSchema } from './schemas';
 import { AuthService } from './service';
+import { setRefreshCookie, signAccessToken, signRefreshToken } from './token';
 import { ensureIdempotencyKey } from '../common/idempotency';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
@@ -23,9 +24,21 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
         return;
       }
       const body = loginSchema.parse(request.body);
-      const result = await AuthService.login(body.username, body.password, request.ip);
+      const user = await AuthService.login(body.username, body.password, request.ip);
+      const accessToken = signAccessToken({
+        sub: user.id,
+        role: user.role,
+        username: user.username
+      });
+      const refreshToken = signRefreshToken({
+        sub: user.id,
+        tokenVersion: user.tokenVersion
+      });
+
+      setRefreshCookie(reply, refreshToken);
+
       const csrfToken = issueCsrfToken(reply);
-      return reply.send({ ...result, csrfToken });
+      return reply.send({ accessToken, user, csrfToken });
     }
   );
 

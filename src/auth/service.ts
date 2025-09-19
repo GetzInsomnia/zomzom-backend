@@ -1,12 +1,10 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../prisma/client';
 import { env } from '../env';
 import { httpError } from '../common/utils/httpErrors';
 import { Role } from '../prisma/types';
 import { createAuditLog } from '../common/utils/audit';
 
-const TOKEN_EXPIRY_SECONDS = 15 * 60; // 15 minutes
 const BCRYPT_SALT_ROUNDS = 10;
 
 export class AuthService {
@@ -73,27 +71,14 @@ export class AuthService {
       throw httpError(401, 'Invalid credentials');
     }
 
-    const token = jwt.sign(
-      {
-        sub: authenticatedUser.id,
-        role: authenticatedUser.role,
-        username: authenticatedUser.username
-      },
-      env.JWT_SECRET,
-      { expiresIn: TOKEN_EXPIRY_SECONDS }
-    );
+    await logAttempt(true, { userId: authenticatedUser.id });
 
     return {
-      token,
-      expiresIn: TOKEN_EXPIRY_SECONDS,
-      user: {
-        id: authenticatedUser.id,
-        username: authenticatedUser.username,
-        role: authenticatedUser.role as Role
-      }
+      id: authenticatedUser.id,
+      username: authenticatedUser.username,
+      role: authenticatedUser.role as Role,
+      tokenVersion: authenticatedUser.tokenVersion
     };
-
-    await logAttempt(true, { userId: authenticatedUser.id });
   }
 
   static async getProfile(userId: string) {
