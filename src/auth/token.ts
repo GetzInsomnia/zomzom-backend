@@ -19,28 +19,28 @@ type ReplyCookieOptions = Parameters<FastifyReply['setCookie']>[2];
 
 const getRefreshCookieOptions = (): ReplyCookieOptions => {
   const options: ReplyCookieOptions = {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: env.COOKIE_SECURE || env.NODE_ENV === 'production',
-    path: '/',
+    httpOnly: env.REFRESH_COOKIE_HTTP_ONLY,
+    sameSite: env.REFRESH_COOKIE_SAME_SITE,
+    secure: env.REFRESH_COOKIE_SECURE || env.NODE_ENV === 'production',
+    path: env.REFRESH_COOKIE_PATH,
   };
 
-  if (typeof env.REFRESH_TOKEN_EXPIRES === 'number') {
-    options.maxAge = env.REFRESH_TOKEN_EXPIRES;
+  if (typeof env.REFRESH_TOKEN_EXPIRES_IN === 'number') {
+    options.maxAge = env.REFRESH_TOKEN_EXPIRES_IN;
   }
 
-  if (env.COOKIE_DOMAIN) {
-    options.domain = env.COOKIE_DOMAIN;
+  if (env.REFRESH_COOKIE_DOMAIN) {
+    options.domain = env.REFRESH_COOKIE_DOMAIN;
   }
 
   return options;
 };
 
-const accessTokenExpiresIn = env.ACCESS_TOKEN_EXPIRES as SignOptions['expiresIn'];
-const refreshTokenExpiresIn = env.REFRESH_TOKEN_EXPIRES as SignOptions['expiresIn'];
+const accessTokenExpiresIn = env.ACCESS_TOKEN_EXPIRES_IN as SignOptions['expiresIn'];
+const refreshTokenExpiresIn = env.REFRESH_TOKEN_EXPIRES_IN as SignOptions['expiresIn'];
 
 export function signAccessToken(payload: AccessTokenPayload) {
-  return jwt.sign(payload, env.JWT_SECRET, {
+  return jwt.sign(payload, env.ACCESS_TOKEN_SECRET, {
     expiresIn: accessTokenExpiresIn,
   });
 }

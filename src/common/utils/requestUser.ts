@@ -2,6 +2,8 @@ import type { FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import type { $Enums } from '@prisma/client';
 
+import { env } from '../../env';
+
 type UserClaims = {
   sub: string;
   username: string;
@@ -18,7 +20,7 @@ export async function getUserFromRequest(req: FastifyRequest) {
     return null;
   }
 
-  const secret = process.env.JWT_SECRET || '';
+  const secret = env.ACCESS_TOKEN_SECRET;
   if (!secret) {
     return null;
   }
