@@ -1,13 +1,15 @@
+// src/types/fastify.d.ts
 import 'fastify';
-import { Role } from '../prisma/types';
+
+export type UserClaims = {
+  id: string;
+  username: string;
+  role?: 'ADMIN' | 'USER';
+};
 
 declare module 'fastify' {
   interface FastifyRequest {
-    user?: {
-      id: string;
-      username: string;
-      role: Role;
-    };
+    user?: UserClaims;
     previewMode?: boolean;
     cookies: Record<string, string | undefined>;
   }
