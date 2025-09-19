@@ -1,6 +1,5 @@
 /// <reference path="../global.d.ts" />
 import type { FastifyPluginAsync } from 'fastify';
-import { authGuard } from '../common/middlewares/authGuard';
 import { clearCsrfCookie, issueCsrfToken } from '../common/middlewares/csrf';
 import { loginSchema } from './schemas';
 import { AuthService } from './service';
@@ -25,12 +24,12 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.get('/v1/auth/me', { preHandler: [authGuard] }, async (req, reply) => {
+  app.get('/v1/auth/me', { preHandler: [app.authenticate] }, async (req, reply) => {
     if (!req.user) return reply.code(401).send({ error: 'UNAUTHORIZED' });
     return { user: req.user };
   });
 
-  app.post('/v1/auth/logout', { preHandler: [authGuard] }, async (_req, reply) => {
+  app.post('/v1/auth/logout', { preHandler: [app.authenticate] }, async (_req, reply) => {
     reply.clearCookie('token', { path: '/' });
     return { ok: true };
   });
