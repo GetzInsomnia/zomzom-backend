@@ -383,8 +383,25 @@ function extractZodEnvKeys(src){
   const envObj = parseDotEnvFile(envPath);
   addCheck(lines, '.env file present', exists(envPath));
   addCheck(lines, 'DATABASE_URL present', !!envObj.DATABASE_URL, envObj.DATABASE_URL ? '' : 'add to .env');
-  const jwtLen = (envObj.JWT_SECRET||'').length;
-  addCheck(lines, 'JWT_SECRET present (>=32 chars)', !!envObj.JWT_SECRET && jwtLen>=32, envObj.JWT_SECRET? `length=${jwtLen}`:'missing');
+  const accessLen = (envObj.ACCESS_TOKEN_SECRET||'').length;
+  addCheck(
+    lines,
+    'ACCESS_TOKEN_SECRET present (>=32 chars)',
+    !!envObj.ACCESS_TOKEN_SECRET && accessLen>=32,
+    envObj.ACCESS_TOKEN_SECRET? `length=${accessLen}`:'missing'
+  );
+  const refreshLen = (envObj.REFRESH_TOKEN_SECRET||'').length;
+  addCheck(
+    lines,
+    'REFRESH_TOKEN_SECRET present (>=32 chars)',
+    !!envObj.REFRESH_TOKEN_SECRET && refreshLen>=32,
+    envObj.REFRESH_TOKEN_SECRET? `length=${refreshLen}`:'missing'
+  );
+  addCheck(lines, 'ACCESS_TOKEN_EXPIRES_IN present', !!envObj.ACCESS_TOKEN_EXPIRES_IN, envObj.ACCESS_TOKEN_EXPIRES_IN || 'missing');
+  addCheck(lines, 'REFRESH_TOKEN_EXPIRES_IN present', !!envObj.REFRESH_TOKEN_EXPIRES_IN, envObj.REFRESH_TOKEN_EXPIRES_IN || 'missing');
+  addCheck(lines, 'REFRESH_COOKIE_HTTP_ONLY flag present', envObj.REFRESH_COOKIE_HTTP_ONLY !== undefined, String(envObj.REFRESH_COOKIE_HTTP_ONLY ?? 'missing'));
+  addCheck(lines, 'REFRESH_COOKIE_SECURE flag present', envObj.REFRESH_COOKIE_SECURE !== undefined, String(envObj.REFRESH_COOKIE_SECURE ?? 'missing'));
+  addCheck(lines, 'REFRESH_COOKIE_SAME_SITE present', !!envObj.REFRESH_COOKIE_SAME_SITE, envObj.REFRESH_COOKIE_SAME_SITE || 'missing');
   addCheck(lines, 'CORS_ORIGIN present', !!envObj.CORS_ORIGIN, envObj.CORS_ORIGIN || 'missing');
 
   // server.ts checks
@@ -441,13 +458,23 @@ function extractZodEnvKeys(src){
   const hasEnv = exists(envPath);
   lines.push(`- ${hasEnv ? '✅' : '❌'} .env file present`);
   let envContent = hasEnv ? read(envPath, 256 * 1024) : '';
-  const needKeys = ['DATABASE_URL', 'JWT_SECRET', 'CORS_ORIGIN'];
+  const needKeys = [
+    'DATABASE_URL',
+    'ACCESS_TOKEN_SECRET',
+    'REFRESH_TOKEN_SECRET',
+    'ACCESS_TOKEN_EXPIRES_IN',
+    'REFRESH_TOKEN_EXPIRES_IN',
+    'REFRESH_COOKIE_HTTP_ONLY',
+    'REFRESH_COOKIE_SECURE',
+    'REFRESH_COOKIE_SAME_SITE',
+    'CORS_ORIGIN'
+  ];
   for (const k of needKeys) {
     const ok = hasEnv && new RegExp(`^${k}=`, 'm').test(envContent || '');
-    if (k === 'JWT_SECRET' && ok) {
-      const m = (envContent || '').match(/^JWT_SECRET=(.+)$/m);
+    if ((k === 'ACCESS_TOKEN_SECRET' || k === 'REFRESH_TOKEN_SECRET') && ok) {
+      const m = (envContent || '').match(new RegExp(`^${k}=(.+)$`, 'm'));
       const len = m ? (m[1] || '').trim().length : 0;
-      lines.push(`- ${len >= 32 ? '✅' : '❌'} JWT_SECRET present (>=32 chars) — length=${len}`);
+      lines.push(`- ${len >= 32 ? '✅' : '❌'} ${k} present (>=32 chars) — length=${len}`);
     } else {
       lines.push(`- ${ok ? '✅' : '❌'} ${k} present`);
     }

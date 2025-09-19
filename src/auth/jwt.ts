@@ -9,6 +9,7 @@ import type {
 import jwt from 'jsonwebtoken';
 import type { $Enums } from '@prisma/client';
 
+import { env } from '../env';
 import { prisma } from '../prisma/client';
 
 type UserClaims = {
@@ -21,9 +22,9 @@ type UserClaims = {
 };
 
 const jwtPlugin: FastifyPluginAsync = async (app) => {
-  const secret = process.env.JWT_SECRET || '';
+  const secret = env.ACCESS_TOKEN_SECRET;
   if (secret.length < 32) {
-    app.log.warn('JWT_SECRET is missing/too short (>=32 chars recommended).');
+    app.log.warn('ACCESS_TOKEN_SECRET is missing/too short (>=32 chars recommended).');
   }
 
   // ประกาศ property ที่ runtime ด้วย (ช่วยทั้ง runtime + บอกเจตนา)

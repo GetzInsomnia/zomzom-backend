@@ -51,7 +51,15 @@ With a clean database, run the following in order: `npx prisma migrate deploy`, 
 | --- | --- |
 | `DATABASE_URL` | MySQL connection string (`mysql://USER:PASS@HOST:3306/DB`) |
 | `SHADOW_DATABASE_URL` | Optional MySQL URL used only by `prisma migrate dev` when generating migrations |
-| `JWT_SECRET` | 32+ character secret for signing JWT access tokens |
+| `ACCESS_TOKEN_SECRET` | 32+ character secret for signing JWT access tokens |
+| `REFRESH_TOKEN_SECRET` | 32+ character secret for signing JWT refresh tokens |
+| `ACCESS_TOKEN_EXPIRES_IN` | Access token lifetime (seconds or time expression like `15m`) |
+| `REFRESH_TOKEN_EXPIRES_IN` | Refresh token lifetime (seconds or time expression like `7d`) |
+| `REFRESH_COOKIE_HTTP_ONLY` | `true`/`false` flag controlling the refresh cookie `HttpOnly` attribute |
+| `REFRESH_COOKIE_SECURE` | `true`/`false` flag forcing the refresh cookie `Secure` attribute (defaults to `true` in production) |
+| `REFRESH_COOKIE_SAME_SITE` | SameSite mode for the refresh cookie (`lax`/`strict`/`none`) |
+| `REFRESH_COOKIE_PATH` | Path scope for the refresh cookie (`/`) |
+| `REFRESH_COOKIE_DOMAIN` | Optional domain for the refresh cookie |
 | `ADMIN_FALLBACK_USERNAME` | Optional emergency admin username accepted only when no users exist |
 | `ADMIN_FALLBACK_PASSWORD` | Optional emergency admin password paired with the fallback username |
 | `CORS_ORIGIN` | Comma-delimited origin allow list (production must include `https://www.zomzomproperty.com`) |
@@ -125,7 +133,7 @@ All state-changing routes require the `x-csrf-token` header to match the `csrfTo
 
 1. Create a **Node.js** application in Plesk (recommended subdomain: `api.zomzomproperty.com`).
 2. Upload the repository or configure Git deployment.
-3. Configure environment variables in Plesk using the values from `.env.example` (ensure a strong `JWT_SECRET` and production `CORS_ORIGIN`).
+3. Configure environment variables in Plesk using the values from `.env.example` (ensure a strong `ACCESS_TOKEN_SECRET`/`REFRESH_TOKEN_SECRET` pair and production `CORS_ORIGIN`).
 4. Set the Node.js startup file to `dist/server.js` and the application mode to “production”.
 5. Install dependencies and run migrations:
    ```bash
