@@ -1,0 +1,208 @@
+# PRISMA
+
+## Enums
+- **Role**: ADMIN, EDITOR, AGENT, USER
+- **PropertyFlag**: NEGOTIABLE, SPECIAL_PRICE, NET_PRICE, MEET_IN_PERSON, NO_LIEN, LIENED
+- **WorkflowState**: DRAFT, REVIEW, SCHEDULED, PUBLISHED, HIDDEN, ARCHIVED
+- **PropertyType**: HOUSE, TOWNHOME, COMMERCIAL, TWINHOUSE, AFFORDABLE, FLAT, CONDO, ROOM, LAND, COURSE, FORM, OTHER
+- **PropertyStatus**: AVAILABLE, RESERVED, SOLD
+
+## Models & fields (raw)
+
+### User
+```
+id           String    @id @default(cuid())
+username     String    @unique
+passwordHash String
+role         Role      @default(ADMIN)
+localePref   String?   // admin UI locale
+isActive     Boolean   @default(true)
+createdAt    DateTime  @default(now())
+updatedAt    DateTime  @updatedAt
+auditLogs    AuditLog[]
+changeSets   ChangeSet[] @relation("ChangeSetCreatedBy")
+favorites    Favorite[]
+```
+
+### Property
+```
+id              String                 @id @default(cuid())
+slug            String                 @unique
+status          PropertyStatus         @default(AVAILABLE)
+type            PropertyType
+price           Int
+area            Float?
+beds            Int?
+baths           Int?
+furnished       Boolean?               @default(false)
+locationId      String?
+location        Location?              @relation(fields: [locationId], references: [id])
+createdAt       DateTime               @default(now())
+updatedAt       DateTime               @updatedAt
+reservedUntil   DateTime?
+deposit         Boolean                @default(false)
+workflowState   WorkflowState          @default(DRAFT)
+workflowChangedAt DateTime             @default(now())
+publishedAt     DateTime?
+scheduledAt     DateTime?
+hiddenAt        DateTime?
+isHidden        Boolean                @default(false)
+deletedAt       DateTime?
+images          PropertyImage[]
+i18n            PropertyI18N[]
+flags           PropertyFlagOnProperty[]
+favorites       Favorite[]
+viewStats       ViewStat[]
+transitStations PropertyTransitStation[]
+```
+
+### PropertyImage
+```
+id         String   @id @default(cuid())
+propertyId String
+url        String
+variants   Json?
+order      Int      @default(0)
+property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+```
+
+### PropertyI18N
+```
+id          String   @id @default(cuid())
+propertyId  String
+locale      String
+title       String
+description String?
+amenities   Json?
+property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+```
+
+### Article
+```
+id         String        @id @default(cuid())
+slug       String        @unique
+workflowState WorkflowState @default(DRAFT)
+workflowChangedAt DateTime  @default(now())
+published  Boolean       @default(false)
+publishedAt DateTime?
+scheduledAt DateTime?
+hiddenAt   DateTime?
+deletedAt  DateTime?
+updatedAt  DateTime      @updatedAt
+createdAt  DateTime      @default(now())
+i18n       ArticleI18N[]
+```
+
+### ArticleI18N
+```
+id        String  @id @default(cuid())
+articleId String
+locale    String
+title     String
+body      String? @db.LongText
+article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+```
+
+### ChangeSet
+```
+id         String   @id @default(cuid())
+entityType String
+entityId   String?
+patch      Json
+status     String
+scheduleAt DateTime?
+createdBy  String
+createdAt  DateTime @default(now())
+updatedAt  DateTime @updatedAt
+jobs       PublishJob[]
+creator    User     @relation("ChangeSetCreatedBy", fields: [createdBy], references: [id])
+```
+
+### PublishJob
+```
+id           String    @id @default(cuid())
+changesetId  String
+runAt        DateTime
+status       String
+log          String?
+createdAt    DateTime  @default(now())
+changeSet    ChangeSet @relation(fields: [changesetId], references: [id], onDelete: Cascade)
+```
+
+### AuditLog
+```
+id         String   @id @default(cuid())
+userId     String?
+action     String
+entityType String
+entityId   String?
+meta       Json?
+ipAddress  String?
+createdAt  DateTime @default(now())
+user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+```
+
+### Rate
+```
+code      String  @id
+value     Float
+updatedAt DateTime @default(now())
+```
+
+### Location
+```
+id         String     @id @default(cuid())
+province   String
+district   String?
+subdistrict String?
+lat        Float?
+lng        Float?
+properties Property[]
+```
+
+### PropertyFlagOnProperty
+```
+id         String        @id @default(cuid())
+propertyId String
+flag       PropertyFlag
+assignedAt DateTime      @default(now())
+property   Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+```
+
+### Favorite
+```
+id         String   @id @default(cuid())
+userId     String
+propertyId String
+createdAt  DateTime @default(now())
+user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+```
+
+### ViewStat
+```
+id         String   @id @default(cuid())
+propertyId String
+bucket     DateTime
+views      Int      @default(0)
+property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+```
+
+### TransitStation
+```
+id          String                    @id @default(cuid())
+name        String
+type        String
+lat         Float?
+lng         Float?
+properties  PropertyTransitStation[]
+```
+
+### PropertyTransitStation
+```
+propertyId String
+stationId  String
+distance   Int?
+property   Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+station    TransitStation  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+```
