@@ -2,11 +2,16 @@ import { config } from 'dotenv';
 import bcrypt from 'bcryptjs';
 import {
   PrismaClient,
+  PropertyFlag,
   PropertyStatus,
   PropertyType,
   WorkflowState,
   Role
 } from '@prisma/client';
+import { z } from 'zod';
+
+import { ZAmenity } from '../src/catalog/filters.schema';
+import { TRANSIT_STATIONS, type TransitStationId } from '../src/catalog/transit';
 
 config();
 
@@ -16,6 +21,13 @@ type LocaleContent = {
   en: string;
   th: string;
   zh: string;
+};
+
+type Amenity = z.infer<typeof ZAmenity>;
+
+type PropertyTransitStationSeed = {
+  stationId: TransitStationId;
+  distance?: number;
 };
 
 type PropertySeed = {
@@ -39,7 +51,9 @@ type PropertySeed = {
   images: string[];
   title: LocaleContent;
   description: LocaleContent;
-  amenities: Record<string, boolean>;
+  amenities: Amenity[];
+  flags: PropertyFlag[];
+  transitStations?: PropertyTransitStationSeed[];
 };
 
 const propertySeeds: PropertySeed[] = [
@@ -74,13 +88,12 @@ const propertySeeds: PropertySeed[] = [
       th: 'ห้องมุมสองห้องนอนวิวแม่น้ำกว้าง พร้อมทางเชื่อม BTS โดยตรงในเขตบางรัก.',
       zh: '两居室转角单位，享有昭披耶河全景，并可直接连通轻轨。'
     },
-    amenities: {
-      parking: true,
-      pool: true,
-      security: true,
-      gym: true,
-      concierge: true
-    }
+    amenities: ['parking', 'pool', 'security', 'gym', 'concierge'],
+    flags: [PropertyFlag.SPECIAL_PRICE, PropertyFlag.NO_LIEN],
+    transitStations: [
+      { stationId: 'BTS_SILOM_SALA_DAENG', distance: 250 },
+      { stationId: 'MRT_BLUE_HUA_LAMPHONG', distance: 600 }
+    ]
   },
   {
     slug: 'chiangmai-mountain-villa',
@@ -113,13 +126,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'บ้านพักในโครงการพร้อมระบบรักษาความปลอดภัย ติดดอยสุเทพพร้อมสระน้ำเกลือและสวนเขตร้อน.',
       zh: '位于素帖山麓的保安社区，配备私家盐水泳池及热带花园。'
     },
-    amenities: {
-      parking: true,
-      pool: true,
-      security: true,
-      garden: true,
-      smartHome: true
-    }
+    amenities: ['parking', 'pool', 'security', 'garden', 'smartHome'],
+    flags: [PropertyFlag.NEGOTIABLE, PropertyFlag.MEET_IN_PERSON]
   },
   {
     slug: 'phuket-marina-condo',
@@ -153,13 +161,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'คอนโดพร้อมเฟอร์นิเจอร์ครบ วิวมารีน่า พร้อมทางลงเรือส่วนตัวและเทอเรซชมพระอาทิตย์ตก.',
       zh: '精装修码头景观公寓，配有私人泊位通道与观景露台。'
     },
-    amenities: {
-      parking: true,
-      pool: true,
-      security: true,
-      marina: true,
-      rooftop: true
-    }
+    amenities: ['parking', 'pool', 'security', 'marina', 'rooftop'],
+    flags: [PropertyFlag.NET_PRICE, PropertyFlag.NO_LIEN]
   },
   {
     slug: 'chonburi-beachfront-land',
@@ -189,11 +192,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'ที่ดินติดหาดวงศ์อมาตย์ขนาด 6 ไร่ เหมาะสำหรับพัฒนารีสอร์ตหรือเรสซิเดนซ์แบรนด์ดัง.',
       zh: '位于旺阿玛海滩的黄金 6 莱土地，适合打造度假村或品牌公寓。'
     },
-    amenities: {
-      beachfront: true,
-      roadAccess: true,
-      utilities: true
-    }
+    amenities: ['beachfront', 'roadAccess', 'utilities'],
+    flags: [PropertyFlag.NEGOTIABLE]
   },
   {
     slug: 'khonkaen-business-hub',
@@ -226,12 +226,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'อาคารสำนักงานหัวมุม 6 ชั้น มีพื้นที่โชว์รูมติดถนนมิตรภาพใกล้เซ็นทรัลพลาซ่า.',
       zh: '六层转角写字楼，Mittraphap 路临街展示面，近中央广场。'
     },
-    amenities: {
-      parking: true,
-      elevator: true,
-      backupPower: true,
-      meetingRooms: true
-    }
+    amenities: ['parking', 'elevator', 'backupPower', 'meetingRooms'],
+    flags: [PropertyFlag.SPECIAL_PRICE, PropertyFlag.MEET_IN_PERSON]
   },
   {
     slug: 'bangkok-luxury-penthouse',
@@ -264,13 +260,9 @@ const propertySeeds: PropertySeed[] = [
       th: 'เพนท์เฮาส์สองชั้นพร้อมสระจากุซซี่ส่วนตัว เลาจ์บนฟ้า และวิวเมืองรอบด้าน.',
       zh: '双层顶层公寓，带私家浸泡池、空中酒廊及全景城市天际线。'
     },
-    amenities: {
-      parking: true,
-      pool: true,
-      security: true,
-      skyLounge: true,
-      concierge: true
-    }
+    amenities: ['parking', 'pool', 'security', 'skyLounge', 'concierge'],
+    flags: [PropertyFlag.SPECIAL_PRICE, PropertyFlag.NO_LIEN],
+    transitStations: [{ stationId: 'BTS_SUKHUMVIT_SIAM', distance: 180 }]
   },
   {
     slug: 'samutprakarn-industrial-warehouse',
@@ -302,12 +294,9 @@ const propertySeeds: PropertySeed[] = [
       th: 'คลังสินค้าหลังคาสูง ใกล้สนามบินสุวรรณภูมิ พร้อมท่าขนถ่ายและห้องเย็น.',
       zh: '位于素万那普机场附近的高层仓库，带装卸码头及冷链选项。'
     },
-    amenities: {
-      loadingDocks: true,
-      security: true,
-      truckAccess: true,
-      coldStorageReady: true
-    }
+    amenities: ['loadingDocks', 'security', 'truckAccess', 'coldStorageReady'],
+    flags: [PropertyFlag.NEGOTIABLE, PropertyFlag.MEET_IN_PERSON],
+    transitStations: [{ stationId: 'ARL_CITY_LINE_SUVARNABHUMI', distance: 5200 }]
   },
   {
     slug: 'chiangrai-eco-resort',
@@ -340,12 +329,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'กลุ่มวิลล่าไม้สักพร้อมสปาสมุนไพร มองเห็นไร่ชาเขียวขจี.',
       zh: '柚木别墅群，配备草本水疗，可俯瞰连绵茶园。'
     },
-    amenities: {
-      spa: true,
-      garden: true,
-      parking: true,
-      solarPanels: true
-    }
+    amenities: ['spa', 'garden', 'parking', 'solarPanels'],
+    flags: [PropertyFlag.SPECIAL_PRICE]
   },
   {
     slug: 'nan-riverside-land',
@@ -375,11 +360,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'ที่ดินเงียบสงบติดแม่น้ำน่าน ล้อมด้วยวิวภูเขา เหมาะทำโฮมสเตย์บูทีค.',
       zh: '静谧河畔地块，群山环绕，适合打造精品民宿。'
     },
-    amenities: {
-      riverfront: true,
-      utilities: true,
-      farmland: true
-    }
+    amenities: ['riverfront', 'utilities', 'farmland'],
+    flags: [PropertyFlag.NEGOTIABLE]
   },
   {
     slug: 'ayutthaya-heritage-house',
@@ -412,12 +394,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'บ้านไม้สักปรับปรุงใหม่ ผสานสถาปัตยกรรมไทยและการอยู่อาศัยริมแม่น้ำยุคใหม่.',
       zh: '翻新柚木宅邸，融合泰式传统与现代河畔生活。'
     },
-    amenities: {
-      parking: true,
-      garden: true,
-      security: true,
-      riverDeck: true
-    }
+    amenities: ['parking', 'garden', 'security', 'riverDeck'],
+    flags: [PropertyFlag.MEET_IN_PERSON, PropertyFlag.NO_LIEN]
   },
   {
     slug: 'pattaya-sunset-condo',
@@ -450,12 +428,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'ห้องชั้นสูงวิวอ่าวพัทยา พร้อมสิ่งอำนวยความสะดวกแบบรีสอร์ตและเลานจ์โคเวิร์กกิ้ง.',
       zh: '高层海景房，俯瞰芭提雅湾，配备度假式设施与共享办公区。'
     },
-    amenities: {
-      pool: true,
-      gym: true,
-      coworking: true,
-      security: true
-    }
+    amenities: ['pool', 'gym', 'coworking', 'security'],
+    flags: [PropertyFlag.SPECIAL_PRICE]
   },
   {
     slug: 'korat-family-home',
@@ -488,12 +462,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'บ้านสไตล์โมเดิร์นใกล้โรงเรียนและเดอะมอลล์โคราช พร้อมครัวคู่และสนามเด็กเล่น.',
       zh: '近学校与呵叻商场的现代家庭屋，配备双厨房及草坪游乐区。'
     },
-    amenities: {
-      parking: true,
-      garden: true,
-      security: true,
-      playroom: true
-    }
+    amenities: ['parking', 'garden', 'security', 'playroom'],
+    flags: [PropertyFlag.NEGOTIABLE, PropertyFlag.NO_LIEN]
   },
   {
     slug: 'hua-hin-golf-villa',
@@ -526,13 +496,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'วิลล่าสระส่วนตัวในสนามกอล์ฟระดับนานาชาติ พร้อมเรือนรับรองและครัวกลางแจ้ง.',
       zh: '位于国际高尔夫球场内的私家泳池别墅，设宾客亭与户外厨房。'
     },
-    amenities: {
-      pool: true,
-      parking: true,
-      garden: true,
-      outdoorKitchen: true,
-      security: true
-    }
+    amenities: ['pool', 'parking', 'garden', 'outdoorKitchen', 'security'],
+    flags: [PropertyFlag.MEET_IN_PERSON, PropertyFlag.NO_LIEN]
   },
   {
     slug: 'ubon-cultural-hotel',
@@ -565,12 +530,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'โรงแรมริมแม่น้ำ 32 ห้อง มีคาเฟ่ สตูดิโอศิลป์ และลานกิจกรรม ใกล้ทุ่งศรีเมือง.',
       zh: '临河32间客房的精品酒店，含咖啡馆、手作工坊与活动庭院，邻近Thung Si Mueang。'
     },
-    amenities: {
-      cafe: true,
-      parking: true,
-      eventSpace: true,
-      security: true
-    }
+    amenities: ['cafe', 'parking', 'eventSpace', 'security'],
+    flags: [PropertyFlag.NET_PRICE, PropertyFlag.NO_LIEN]
   },
   {
     slug: 'krabi-hillside-land',
@@ -600,11 +561,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'ที่ดินลาดเอียงอ่อนพร้อมวิวภูผาหินปูนและมองเห็นทะเลอันดามันไกลๆ.',
       zh: '坡度平缓的土地，背靠石灰岩山，远眺安达曼海。'
     },
-    amenities: {
-      utilities: true,
-      roadAccess: true,
-      seaView: true
-    }
+    amenities: ['utilities', 'roadAccess', 'seaView'],
+    flags: [PropertyFlag.NEGOTIABLE]
   },
   {
     slug: 'bangkok-modern-office',
@@ -635,12 +593,9 @@ const propertySeeds: PropertySeed[] = [
       th: 'อาคารสำนักงาน 12 ชั้น พื้นที่โล่งไร้คาน ระบบเข้าออกอัจฉริยะ และโรงอาหารบนดาดฟ้า.',
       zh: '十二层无柱写字楼，配置智能门禁与屋顶餐厅。'
     },
-    amenities: {
-      parking: true,
-      elevator: true,
-      backupPower: true,
-      cafeteria: true
-    }
+    amenities: ['parking', 'elevator', 'backupPower', 'cafeteria'],
+    flags: [PropertyFlag.NET_PRICE, PropertyFlag.NO_LIEN],
+    transitStations: [{ stationId: 'MRT_BLUE_BANG_SUE', distance: 3200 }]
   },
   {
     slug: 'phitsanulok-suburban-house',
@@ -673,12 +628,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'บ้านครอบครัวโปร่งสว่าง มีห้องทำงาน สนามหญ้าหลังบ้าน และโรงจอดรถสองคัน ใกล้ถนนบายพาส.',
       zh: '采光充足家庭宅，含家庭办公室、后院草坪与双车库，靠近环城公路。'
     },
-    amenities: {
-      parking: true,
-      garden: true,
-      security: true,
-      homeOffice: true
-    }
+    amenities: ['parking', 'garden', 'security', 'homeOffice'],
+    flags: [PropertyFlag.NEGOTIABLE]
   },
   {
     slug: 'rayong-smart-factory',
@@ -709,12 +660,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'โรงงานสร้างเสร็จพร้อมคลีนรูม หลังคาพลังงานแสงอาทิตย์ และการเชื่อมต่อโลจิสติกส์ EEC.',
       zh: '配备洁净室与太阳能屋顶的成品工厂，连接东部经济走廊物流网络。'
     },
-    amenities: {
-      loadingDocks: true,
-      solarPanels: true,
-      security: true,
-      officeWing: true
-    }
+    amenities: ['loadingDocks', 'solarPanels', 'security', 'officeWing'],
+    flags: [PropertyFlag.NET_PRICE, PropertyFlag.MEET_IN_PERSON]
   },
   {
     slug: 'suratthani-riverfront-condo',
@@ -748,12 +695,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'ที่พักริมแม่น้ำพร้อมดาดฟ้าวิ่ง ครัวส่วนกลาง และบริการชัทเทิลไปท่าเรือเฟอร์รี่.',
       zh: '滨河公寓，配备跑步平台、共享厨房及渡轮码头接驳服务。'
     },
-    amenities: {
-      pool: true,
-      gym: true,
-      coworking: true,
-      riverDeck: true
-    }
+    amenities: ['pool', 'gym', 'coworking', 'riverDeck'],
+    flags: [PropertyFlag.SPECIAL_PRICE]
   },
   {
     slug: 'trat-sea-view-land',
@@ -783,11 +726,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'ที่ดินเนินสูงบนเกาะช้าง วิวอ่าวสองฝั่ง มีทางคอนกรีตเชื่อมต่อจากถนนรอบเกาะ.',
       zh: '象岛高地地块，可眺望双海湾，铺装道路连通环岛主干道。'
     },
-    amenities: {
-      seaView: true,
-      utilities: true,
-      roadAccess: true
-    }
+    amenities: ['seaView', 'utilities', 'roadAccess'],
+    flags: [PropertyFlag.NEGOTIABLE]
   },
   {
     slug: 'bangkok-creative-loft',
@@ -820,12 +760,9 @@ const propertySeeds: PropertySeed[] = [
       th: 'ลอฟต์สไตล์อินดัสเทรียลเพดานสูงสองชั้น มีพื้นที่สตูดิโอศิลปะและเชื่อม BTS.',
       zh: '工业风挑高阁楼，含艺术工作室空间，并与轻轨相连。'
     },
-    amenities: {
-      coworking: true,
-      gym: true,
-      security: true,
-      skyDeck: true
-    }
+    amenities: ['coworking', 'gym', 'security', 'skyDeck'],
+    flags: [PropertyFlag.NET_PRICE, PropertyFlag.NO_LIEN],
+    transitStations: [{ stationId: 'ARL_CITY_LINE_PHAYA_THAI', distance: 450 }]
   },
   {
     slug: 'lampang-heritage-house',
@@ -857,12 +794,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'บ้านเรือนล้านนาปรับปรุงใหม่ พร้อมเรือนเก็บรถม้าและคอร์ทยาร์ดร่มรื่นในเมืองเก่า.',
       zh: '翻新兰纳风格宅邸，带马车房与遮荫庭院，位于老城。'
     },
-    amenities: {
-      parking: true,
-      garden: true,
-      security: true,
-      heritageFeatures: true
-    }
+    amenities: ['parking', 'garden', 'security', 'heritageFeatures'],
+    flags: [PropertyFlag.MEET_IN_PERSON]
   },
   {
     slug: 'sukhothai-boutique-resort',
@@ -894,12 +827,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'รีสอร์ตชื่อดังใกล้อุทยานประวัติศาสตร์ มีวิลล่า 18 หลัง สปา และศูนย์จักรยาน.',
       zh: '靠近历史公园的口碑度假村，拥有18栋别墅、SPA及单车中心。'
     },
-    amenities: {
-      spa: true,
-      parking: true,
-      pool: true,
-      eventSpace: true
-    }
+    amenities: ['spa', 'parking', 'pool', 'eventSpace'],
+    flags: [PropertyFlag.SPECIAL_PRICE, PropertyFlag.MEET_IN_PERSON]
   },
   {
     slug: 'nakhonsawan-greenfield-land',
@@ -929,11 +858,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'ที่ดินเกษตรแบนราบติดคลองชลประทาน เหมาะทำฟาร์มเทคโนโลยีหรือคลังโลจิสติกส์.',
       zh: '平整农田，临灌溉渠，适合农业科技或物流堆场。'
     },
-    amenities: {
-      irrigation: true,
-      roadAccess: true,
-      utilities: true
-    }
+    amenities: ['irrigation', 'roadAccess', 'utilities'],
+    flags: [PropertyFlag.NEGOTIABLE, PropertyFlag.NO_LIEN]
   },
   {
     slug: 'udonthani-city-condo',
@@ -966,12 +892,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'คอนโดใจกลางเมืองติดเซ็นทรัลพลาซ่า พร้อมระบบสมาร์ทโฮมและสวนลอยฟ้า.',
       zh: '位于市中心近中央广场的公寓，配备智能家居及空中花园。'
     },
-    amenities: {
-      pool: true,
-      gym: true,
-      security: true,
-      smartHome: true
-    }
+    amenities: ['pool', 'gym', 'security', 'smartHome'],
+    flags: [PropertyFlag.SPECIAL_PRICE]
   },
   {
     slug: 'maehongson-forest-retreat',
@@ -1003,12 +925,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'รีทรีตที่ใส่ใจสิ่งแวดล้อมพร้อมวิลล่าไม้ไผ่ ศาลานั่งสมาธิ และฟาร์มออร์แกนิกริมแม่น้ำปาย.',
       zh: '环保型度假屋，设竹制别墅、冥想亭及拜河畔有机农场。'
     },
-    amenities: {
-      spa: true,
-      garden: true,
-      meditationSala: true,
-      riverDeck: true
-    }
+    amenities: ['spa', 'garden', 'meditationSala', 'riverDeck'],
+    flags: [PropertyFlag.MEET_IN_PERSON]
   },
   {
     slug: 'bangkok-cozy-studio',
@@ -1041,12 +959,9 @@ const propertySeeds: PropertySeed[] = [
       th: 'สตูดิโอจัดสรรพื้นที่คุ้มค่า พร้อมตู้เก็บของบิวท์อิน ระเบียงวิวเมือง และห้องสมุดส่วนกลาง.',
       zh: '布局高效单间，带内嵌收纳、城市景观阳台与公共图书馆。'
     },
-    amenities: {
-      pool: true,
-      gym: true,
-      library: true,
-      security: true
-    }
+    amenities: ['pool', 'gym', 'library', 'security'],
+    flags: [PropertyFlag.NET_PRICE],
+    transitStations: [{ stationId: 'BTS_SUKHUMVIT_MO_CHIT', distance: 900 }]
   },
   {
     slug: 'hatyai-marketplace',
@@ -1079,12 +994,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'อาคารตลาดหลายชั้นพร้อมฟู้ดคอร์ท โซนร้านศิลป์ และฟาร์มเมืองบนชั้นดาดฟ้า.',
       zh: '多层市场大楼，设美食广场、手作摊位与屋顶城市农场。'
     },
-    amenities: {
-      parking: true,
-      elevator: true,
-      eventSpace: true,
-      rooftopFarm: true
-    }
+    amenities: ['parking', 'elevator', 'eventSpace', 'rooftopFarm'],
+    flags: [PropertyFlag.SPECIAL_PRICE, PropertyFlag.MEET_IN_PERSON]
   },
   {
     slug: 'phangnga-private-villa',
@@ -1117,12 +1028,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'วิลลารับลมทะเลพร้อมสระว่ายน้ำระบบแลป ห้องดูหนัง และห้องพักพนักงานบริการ ใกล้หาดนาใต้.',
       zh: '临海微风别墅，设长泳池、影院室及管家套房，距离那泰海滩数分钟。'
     },
-    amenities: {
-      pool: true,
-      gym: true,
-      cinema: true,
-      butlerSuite: true
-    }
+    amenities: ['pool', 'gym', 'cinema', 'butlerSuite'],
+    flags: [PropertyFlag.SPECIAL_PRICE, PropertyFlag.NO_LIEN]
   },
   {
     slug: 'lopburi-solar-farm',
@@ -1154,11 +1061,8 @@ const propertySeeds: PropertySeed[] = [
       th: 'พื้นที่ 15 ไร่ระดับเดียว มีไฟฟ้า 3 เฟส ติดทางหลวง และมีรายงานผลกระทบสิ่งแวดล้อมครบ.',
       zh: '面积15莱的平坦地块，配备三相电力、临高速路，并已完成环境影响评估。'
     },
-    amenities: {
-      utilities: true,
-      highwayFrontage: true,
-      solarReady: true
-    }
+    amenities: ['utilities', 'highwayFrontage', 'solarReady'],
+    flags: [PropertyFlag.NET_PRICE]
   }
 ];
 
@@ -1215,27 +1119,34 @@ async function ensureLocation(location: LocationInput): Promise<string> {
   return created.id;
 }
 
+function buildAmenityMap(amenities: Amenity[]) {
+  return amenities.reduce<Record<string, boolean>>((acc, amenity) => {
+    acc[amenity] = true;
+    return acc;
+  }, {});
+}
+
+function buildFlagCreateData(flags: PropertyFlag[]) {
+  return flags.map((flag) => ({ flag }));
+}
+
+function buildTransitCreateData(
+  transitStations: PropertyTransitStationSeed[] | undefined
+) {
+  return (transitStations ?? []).map((station) => ({
+    station: { connect: { id: station.stationId } },
+    distance: station.distance ?? null
+  }));
+}
+
 function buildTranslations(property: PropertySeed) {
-  return [
-    {
-      locale: 'en',
-      title: property.title.en,
-      description: property.description.en,
-      amenities: property.amenities
-    },
-    {
-      locale: 'th',
-      title: property.title.th,
-      description: property.description.th,
-      amenities: property.amenities
-    },
-    {
-      locale: 'zh',
-      title: property.title.zh,
-      description: property.description.zh,
-      amenities: property.amenities
-    }
-  ];
+  const locales: (keyof LocaleContent)[] = ['en', 'th', 'zh'];
+  return locales.map((locale) => ({
+    locale,
+    title: property.title[locale],
+    description: property.description[locale],
+    amenities: buildAmenityMap(property.amenities)
+  }));
 }
 
 async function seedAdminUser() {
@@ -1253,6 +1164,27 @@ async function seedAdminUser() {
       role: Role.ADMIN
     }
   });
+}
+
+async function seedTransitStations() {
+  for (const station of TRANSIT_STATIONS) {
+    await prisma.transitStation.upsert({
+      where: { id: station.id },
+      update: {
+        name: station.name,
+        type: station.lineId,
+        lat: station.lat ?? null,
+        lng: station.lng ?? null
+      },
+      create: {
+        id: station.id,
+        name: station.name,
+        type: station.lineId,
+        lat: station.lat ?? null,
+        lng: station.lng ?? null
+      }
+    });
+  }
 }
 
 async function seedProperties() {
@@ -1286,6 +1218,18 @@ async function seedProperties() {
         i18n: {
           deleteMany: {},
           create: buildTranslations(property)
+        },
+        flags: {
+          deleteMany: {},
+          ...(property.flags.length > 0
+            ? { create: buildFlagCreateData(property.flags) }
+            : {})
+        },
+        transitStations: {
+          deleteMany: {},
+          ...(property.transitStations && property.transitStations.length > 0
+            ? { create: buildTransitCreateData(property.transitStations) }
+            : {})
         }
       },
       create: {
@@ -1309,7 +1253,13 @@ async function seedProperties() {
         },
         i18n: {
           create: buildTranslations(property)
-        }
+        },
+        ...(property.flags.length > 0
+          ? { flags: { create: buildFlagCreateData(property.flags) } }
+          : {}),
+        ...(property.transitStations && property.transitStations.length > 0
+          ? { transitStations: { create: buildTransitCreateData(property.transitStations) } }
+          : {})
       }
     });
   }
@@ -1318,6 +1268,7 @@ async function seedProperties() {
 async function main() {
   await prisma.$connect();
   await seedAdminUser();
+  await seedTransitStations();
   await seedProperties();
   console.log('Seeding completed successfully.');
 }
