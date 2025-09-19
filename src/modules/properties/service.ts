@@ -5,7 +5,8 @@ import { isWithinRetention } from '../../common/utils/preview';
 import { IndexService } from '../index/service';
 import { ProcessedImage } from '../uploads/service';
 import { PaginatedResult, PropertyWithRelations } from './dto';
-import { PropertyCreateInput, PropertyQueryInput, PropertyUpdateInput } from './schemas';
+import { PropertyCreateInput, PropertyUpdateInput } from './schemas';
+import { PropertyFilters, resolvePriceRange } from '../../catalog/filters.schema';
 import { WorkflowState } from '../../prisma/types';
 
 type PropertyWhere = Record<string, any>;
@@ -13,15 +14,21 @@ type IntFilter = { gte?: number; lte?: number };
 
 const SOFT_DELETE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-type PropertyServiceOptions = { preview?: boolean };
+type PropertyServiceOptions = {
+  preview?: boolean;
+  pagination?: {
+    page?: number;
+    pageSize?: number;
+  };
+};
 
 export class PropertyService {
   static async listProperties(
-    filters: PropertyQueryInput,
+    filters: PropertyFilters,
     options: PropertyServiceOptions = {}
   ): Promise<PaginatedResult<PropertyWithRelations>> {
-    const page = Number(filters.page ?? 1);
-    const pageSize = Number(filters.pageSize ?? 20);
+    const page = Number(options.pagination?.page ?? 1);
+    const pageSize = Number(options.pagination?.pageSize ?? 20);
     const skip = (page - 1) * pageSize;
 
     const where: PropertyWhere = {};
@@ -34,33 +41,25 @@ export class PropertyService {
       where.type = filters.type;
     }
 
-    if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
-      const priceFilter: IntFilter = {};
-      if (filters.priceMin !== undefined) {
-        priceFilter.gte = filters.priceMin;
+    if (filters.priceRange) {
+      const range = resolvePriceRange(filters.priceRange);
+      if (range) {
+        const priceFilter: IntFilter = { gte: range.min };
+        if (range.max !== undefined) {
+          priceFilter.lte = range.max;
+        }
+        where.price = priceFilter;
       }
-      if (filters.priceMax !== undefined) {
-        priceFilter.lte = filters.priceMax;
-      }
-      where.price = priceFilter;
     }
 
-    if (filters.province) {
-      where.location = {
-        is: {
-          province: {
-            contains: filters.province
+    if (filters.secondaryTags && filters.secondaryTags.length > 0) {
+      where.flags = {
+        some: {
+          flag: {
+            in: filters.secondaryTags
           }
         }
       };
-    }
-
-    if (filters.beds !== undefined) {
-      where.beds = { gte: filters.beds };
-    }
-
-    if (filters.baths !== undefined) {
-      where.baths = { gte: filters.baths };
     }
 
     this.applyVisibilityFilters(where, options.preview);

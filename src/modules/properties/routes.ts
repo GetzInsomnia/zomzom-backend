@@ -2,22 +2,33 @@ import { FastifyInstance } from 'fastify';
 import { authenticate, roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { resolvePreviewMode } from '../../common/utils/preview';
+import { ZPropertyFilters, PropertyFilters } from '../../catalog/filters.schema';
+import { z } from 'zod';
 import { UploadService } from '../uploads/service';
 import { PropertyService } from './service';
 import {
   propertyCreateSchema,
   propertyIdParamSchema,
   propertyImageParamSchema,
-  propertyQuerySchema,
   propertyScheduleTransitionSchema,
   propertyUpdateSchema
 } from './schemas';
 
+const ZPropertyListQuery = ZPropertyFilters.extend({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20)
+});
+
 export async function registerPropertyRoutes(app: FastifyInstance) {
   app.get('/v1/properties', async (request) => {
-    const filters = propertyQuerySchema.parse(request.query);
+    const parsed = ZPropertyListQuery.parse(request.query);
+    const { page, pageSize, ...rawFilters } = parsed;
+    const filters = rawFilters as PropertyFilters;
     const { preview } = await resolvePreviewMode(request);
-    const result = await PropertyService.listProperties(filters, { preview });
+    const result = await PropertyService.listProperties(filters, {
+      preview,
+      pagination: { page, pageSize }
+    });
     return result;
   });
 
