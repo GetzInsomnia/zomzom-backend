@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ZTransitLineId, ZTransitStationId } from './transit';
+
 import {
   AMENITIES,
   FURNITURE_OPTIONS,
@@ -26,7 +28,9 @@ export const ZPropertyFilters = z.object({
   priceRange: ZPriceRangeKey.optional(),
   furniture: ZFurniture.optional(),
   secondaryTags: z.array(ZSecondaryTag).optional(),
-  amenities: z.array(ZAmenity).optional()
+  amenities: z.array(ZAmenity).optional(),
+  nearTransitLine: ZTransitLineId.optional(),
+  nearTransitStation: ZTransitStationId.optional()
 });
 
 export type PropertyFilters = z.infer<typeof ZPropertyFilters>;
