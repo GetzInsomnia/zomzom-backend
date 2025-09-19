@@ -1,10 +1,7 @@
 #!/usr/bin/env node
-/** Xray Lite v1.3 — repo inventory & health dump (backend + frontend)
+/** Xray Lite v1.4 — repo inventory & health dump (backend + frontend)
  * Usage: node scripts/xray-lite.js [--out XRAY]
- * Outputs: INVENTORY.md, ROUTES.md, ENV.md, PRISMA.md, SEO.md, SECURITY.md,
- *          PERFORMANCE.md, I18N.md, ADMIN.md, BUILD.json,
- *          FASTIFY_TYPES.md, API_WIRING.md, PRISMA_STATE.md
- * No external deps.
+ * Adds: CHECKS.md (pre-dev checklist verification)
  */
 
 const fs = require('fs');
@@ -49,6 +46,31 @@ const tsconfig = readJSON(path.join(ROOT,'tsconfig.json')) || {};
 const prismaSchemaPath = path.join(ROOT,'prisma','schema.prisma');
 const serverTsPath = path.join(ROOT,'src','server.ts');
 const envTsPath = path.join(ROOT,'src','env.ts');
+
+// ---------- helpers ----------
+function parseDotEnvFile(p){
+  const out = {};
+  if(!exists(p)) return out;
+  const s = read(p, 256*1024) || '';
+  s.split(/\r?\n/).forEach(line=>{
+    const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)\s*$/);
+    if(!m) return;
+    let v = m[2];
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1,-1);
+    }
+    out[m[1]] = v;
+  });
+  return out;
+}
+function addCheck(lines, label, ok, info=''){
+  lines.push(`- ${ok? '✅':'❌'} ${label}${info? ` — ${info}`:''}`);
+}
+function posBefore(s, a, b){
+  const ia = s.indexOf(a), ib = s.indexOf(b);
+  if(ia === -1 || ib === -1) return null;
+  return ia < ib;
+}
 
 // ---------- INVENTORY ----------
 (function(){
@@ -179,13 +201,12 @@ function extractZodEnvKeys(src){
   ].join('\n');
   write('PRISMA.md', md);
 
-  // State (folders)
   const migDir = path.join(ROOT,'prisma','migrations');
   const lines=['# PRISMA_STATE',''];
   if(exists(migDir)){
     const ents=fs.readdirSync(migDir,{withFileTypes:true}).filter(e=>e.isDirectory()).map(e=>e.name).sort();
     lines.push('## migrations directory'); lines.push(...ents.map(n=>`- ${n}`));
-    lines.push('\n**Note:** this tool only lists folders; run `npx prisma migrate status` for live state.');
+    lines.push('\n**Note:** run `npx prisma migrate status` for live state.');
   } else lines.push('- prisma/migrations not found.');
   write('PRISMA_STATE.md', lines.join('\n'));
 })();
@@ -203,7 +224,7 @@ function extractZodEnvKeys(src){
   const robots=path.join(ROOT,'public','robots.txt'), sitemap=path.join(ROOT,'public','sitemap.xml');
   lines.push('\n## public assets');
   lines.push(`- robots.txt: ${exists(robots)?'✅':'❌'}`);
-  lines.push(`- sitemap.xml: ${exists(sitemap)?'✅':'❌'}`);
+  lines.push(`- sitemap.xml: ${exists(sitemap)?'✅ (maybe generated)':'❌'}`);
   write('SEO.md', lines.join('\n'));
 })();
 
@@ -254,9 +275,10 @@ function extractZodEnvKeys(src){
 (function(){
   const lines=['# ADMIN',''];
   const adminPage = path.join(ROOT,'pages','adminmanager.tsx');
-  const adminBack = walk(path.join(ROOT,'src')).filter(f=>/admin/i.test(f)).slice(0,100);
+  const srcDir = path.join(ROOT,'src');
+  const adminBack = exists(srcDir) ? walk(srcDir).filter(f=>/admin/i.test(f)).slice(0,200) : [];
   lines.push(`- Frontend page /adminmanager: ${exists(adminPage)?'✅':'❌'}`);
-  lines.push('\n## Backend admin-related files (by name match)');
+  lines.push('\n## Backend admin-related files (name match)');
   lines.push(adminBack.length? adminBack.map(f=>`- ${rel(f)}`).join('\n'):'- (none)');
   write('ADMIN.md', lines.join('\n'));
 })();
@@ -264,7 +286,8 @@ function extractZodEnvKeys(src){
 // ---------- FASTIFY_TYPES ----------
 (function(){
   const lines=['# FASTIFY_TYPES',''];
-  const typeFiles = walk(path.join(ROOT,'src')).filter(f=>/\.d\.ts$/.test(f));
+  const srcDir = path.join(ROOT,'src');
+  const typeFiles = exists(srcDir) ? walk(srcDir).filter(f=>/\.d\.ts$/.test(f)) : [];
   const aug = typeFiles.filter(f=>{ const s=read(f)||''; return /declare module ['"]fastify['"]/.test(s); });
   lines.push(`- Fastify augmentation files: ${aug.length? '✅' : '❌'}`);
   aug.forEach(f=>lines.push(`  - ${rel(f)}`));
@@ -274,7 +297,6 @@ function extractZodEnvKeys(src){
 // ---------- API_WIRING ----------
 (function(){
   const lines=['# API_WIRING',''];
-  // detect direct Prisma usage in non-backend contexts
   const files = walk(ROOT).filter(f=>/\.(tsx?|jsx?)$/.test(f) && !/node_modules/.test(f));
   const prismaImports = files.filter(f=>{ const s=read(f)||''; return /from\s+['"]@prisma\/client['"]/.test(s); });
   const nextPublicApi = files.filter(f=>{ const s=read(f)||''; return /process\.env\.NEXT_PUBLIC_API_URL/.test(s); });
@@ -288,6 +310,64 @@ function extractZodEnvKeys(src){
   lines.push(`- Files calling Next API (/api/*): ${fetchToLocal.length}`);
   fetchToLocal.slice(0,50).forEach(f=>lines.push(`  - ${rel(f)}`));
   write('API_WIRING.md', lines.join('\n'));
+})();
+
+// ---------- CHECKS (pre-dev checklist) ----------
+(function(){
+  const lines = ['# CHECKS (pre-dev)', ''];
+
+  // .env checks
+  const envPath = path.join(ROOT,'.env');
+  const envObj = parseDotEnvFile(envPath);
+  addCheck(lines, '.env file present', exists(envPath));
+  addCheck(lines, 'DATABASE_URL present', !!envObj.DATABASE_URL, envObj.DATABASE_URL ? '' : 'add to .env');
+  const jwtLen = (envObj.JWT_SECRET||'').length;
+  addCheck(lines, 'JWT_SECRET present (>=32 chars)', !!envObj.JWT_SECRET && jwtLen>=32, envObj.JWT_SECRET? `length=${jwtLen}`:'missing');
+  addCheck(lines, 'CORS_ORIGIN present', !!envObj.CORS_ORIGIN, envObj.CORS_ORIGIN || 'missing');
+
+  // server.ts checks
+  const s = exists(serverTsPath) ? read(serverTsPath, 1024*1024) : '';
+  addCheck(lines, 'server.ts exists', !!s, s? '' : 'src/server.ts missing');
+  if(s){
+    addCheck(lines, 'helmet/cors/rate-limit registered',
+      /@fastify\/helmet/.test(s) && /@fastify\/cors/.test(s) && /@fastify\/rate-limit/.test(s)
+    );
+    const hasJwtReg = /register\(\s*jwtPlugin/.test(s);
+    addCheck(lines, 'jwtPlugin registered', hasJwtReg);
+    const jwtBeforeAuth = posBefore(s, 'register(jwtPlugin', 'registerAuthRoutes(');
+    addCheck(lines, 'jwtPlugin BEFORE registerAuthRoutes', jwtBeforeAuth===true, jwtBeforeAuth===null? 'unable to verify order':'');
+    const hasHealth = /\.get\s*\(\s*([`'"])\/health\1/.test(s) || /url\s*:\s*([`'"])\/health\1/.test(s);
+    addCheck(lines, '/health route exists', hasHealth);
+    const listen0 = /listen\(\s*\{\s*[^}]*host\s*:\s*['"]0\.0\.0\.0['"]/s.test(s);
+    addCheck(lines, "app.listen host '0.0.0.0'", listen0);
+  }
+
+  // Fastify type augmentation
+  const typesDir = path.join(ROOT,'src','types');
+  const dtsFiles = exists(typesDir) ? walk(typesDir).filter(f=>/\.d\.ts$/.test(f)) : [];
+  const hasFastifyAug = dtsFiles.some(f => /declare module ['"]fastify['"]/.test(read(f)||''));
+  addCheck(lines, 'src/types/*.d.ts with fastify augmentation', hasFastifyAug);
+
+  // tsconfig include
+  const include = (tsconfig && tsconfig.include) || [];
+  const hasTypesInclude = include.some(p => /src\/types\/\*\*\/\*\.d\.ts/.test(p) || /src\/\*\*\/\*\.d\.ts/.test(p));
+  addCheck(lines, 'tsconfig.include includes .d.ts', hasTypesInclude, include.length? `include=${JSON.stringify(include)}`:'no include array');
+
+  // Prisma migration & seed
+  const migDir = path.join(ROOT,'prisma','migrations');
+  const hasMigDir = exists(migDir);
+  const migFolders = hasMigDir? fs.readdirSync(migDir,{withFileTypes:true}).filter(e=>e.isDirectory()).map(e=>e.name) : [];
+  addCheck(lines, 'prisma/migrations present', hasMigDir, hasMigDir? `${migFolders.length} folders`:'');
+  addCheck(lines, 'has 000_init migration folder', migFolders.includes('000_init'));
+  addCheck(lines, 'prisma/seed.light.ts present', exists(path.join(ROOT,'prisma','seed.light.ts')));
+
+  // package.json scripts
+  const scripts = (pkg && pkg.scripts) || {};
+  addCheck(lines, 'package.json script: dev', !!scripts.dev);
+  addCheck(lines, 'package.json script: seed:light', !!scripts['seed:light']);
+  addCheck(lines, 'package.json script: generate', !!scripts['generate']);
+
+  write('CHECKS.md', lines.join('\n'));
 })();
 
 // ---------- BUILD.json ----------

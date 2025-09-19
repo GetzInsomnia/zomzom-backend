@@ -1,35 +1,36 @@
-// src/auth/jwt.ts
 import fp from 'fastify-plugin';
-import { FastifyInstance } from 'fastify';
+import type { FastifyPluginCallback } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { env } from '../env';
+import { z } from 'zod';
+import { env } from '../env'; // ต้องมี JWT_SECRET ใน env
 
-type JwtPayload = {
-  sub?: string;
-  id?: string;
-  username?: string;
-  role?: 'ADMIN' | 'USER' | string;
+// shape ของ payload ที่เราจะฝังใน token
+export type UserClaims = {
+  id: string;
+  username: string;
+  role: string; // ใช้ string ให้ยืดหยุ่น หรือจะเปลี่ยนเป็น Role ก็ได้ถ้าแน่ใจว่าตรง schema
 };
 
-export default fp(async function jwtPlugin(app: FastifyInstance) {
-  // ให้มี field user บน request (runtime)
-  app.decorateRequest('user', null);
+const BearerRx = /^Bearer\s+(.+)$/i;
 
-  app.addHook('onRequest', async (request) => {
-    const auth = request.headers.authorization;
-    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
-    if (!token) return;
-
+const plugin: FastifyPluginCallback = (fastify, _opts, done) => {
+  fastify.decorate('authenticate', async (req, reply) => {
     try {
-      const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
-      request.user = {
-        id: String(payload.id ?? payload.sub ?? ''),
-        username: String(payload.username ?? ''),
-        role: payload.role === 'ADMIN' ? 'ADMIN' : 'USER'
-      };
-    } catch {
-      // ปล่อยผ่านเป็น anonymous
-      request.user = undefined;
+      const auth = req.headers.authorization || '';
+      const m = auth.match(BearerRx);
+      if (!m) {
+        reply.code(401).send({ error: 'Missing Authorization header' });
+        return;
+      }
+      const token = m[1];
+      const decoded = jwt.verify(token, env.JWT_SECRET) as UserClaims;
+      req.user = decoded;
+    } catch (err) {
+      reply.code(401).send({ error: 'Invalid token' });
     }
   });
-});
+
+  done();
+};
+
+export default fp(plugin, { name: 'jwt-auth' });
