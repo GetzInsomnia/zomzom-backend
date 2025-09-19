@@ -4,11 +4,8 @@ import { ZodError } from 'zod';
 export function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
   if (error instanceof ZodError) {
     reply.status(400).send({
-      message: 'Validation failed',
-      issues: error.errors.map((issue) => ({
-        path: issue.path.join('.'),
-        message: issue.message
-      }))
+      error: 'BAD_REQUEST',
+      issues: error.format()
     });
     return;
   }
