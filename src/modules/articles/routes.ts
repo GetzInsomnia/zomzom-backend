@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { authenticate, roleGuard } from '../../common/middlewares/authGuard';
+import type { $Enums } from '@prisma/client';
+import { roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { resolvePreviewMode } from '../../common/utils/preview';
 import {
@@ -21,7 +22,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/articles',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request, reply) => {
       const body = articleCreateSchema.parse(request.body);
       const article = await ArticleService.createArticle(body, request.user!.id, {
@@ -34,7 +41,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.patch(
     '/v1/articles/:id',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = articleIdParamSchema.parse(request.params);
       const body = articleUpdateSchema.parse(request.body);
@@ -47,7 +60,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/articles/:id/draft',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'DRAFT', request.user!.id, {
@@ -59,7 +78,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/articles/:id/review',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'REVIEW', request.user!.id, {
@@ -71,7 +96,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/articles/:id/schedule',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = articleIdParamSchema.parse(request.params);
       const body = articleScheduleTransitionSchema.parse(request.body);
@@ -85,7 +116,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/articles/:id/publish',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'PUBLISHED', request.user!.id, {
@@ -97,7 +134,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/articles/:id/hide',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'HIDDEN', request.user!.id, {
@@ -109,7 +152,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.delete(
     '/v1/admin/articles/:id',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request, reply) => {
       const params = articleIdParamSchema.parse(request.params);
       await ArticleService.softDelete(params.id, request.user!.id, {
@@ -121,7 +170,13 @@ export async function registerArticleRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/articles/:id/restore',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.restore(params.id, request.user!.id, {

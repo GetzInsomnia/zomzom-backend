@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { authenticate, roleGuard } from '../../common/middlewares/authGuard';
+import type { $Enums } from '@prisma/client';
+import { roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { resolvePreviewMode } from '../../common/utils/preview';
 import {
@@ -47,7 +48,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/properties',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request, reply) => {
       const body = propertyCreateSchema.parse(request.body);
       const property = await PropertyService.createProperty(body, request.user!.id, {
@@ -60,7 +67,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.patch(
     '/v1/properties/:id',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const body = propertyUpdateSchema.parse(request.body);
@@ -73,7 +86,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/properties/:id/images',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request, reply) => {
       const params = propertyIdParamSchema.parse(request.params);
       const files = await UploadService.parseImageRequest(request);
@@ -88,7 +107,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.delete(
     '/v1/properties/:id/images/:imageId',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request, reply) => {
       const params = propertyImageParamSchema.parse(request.params);
       await PropertyService.removeImage(params.id, params.imageId, request.user!.id, {
@@ -100,7 +125,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/properties/:id/draft',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'DRAFT', request.user!.id, {
@@ -112,7 +143,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/properties/:id/review',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'REVIEW', request.user!.id, {
@@ -124,7 +161,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/properties/:id/schedule',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const body = propertyScheduleTransitionSchema.parse(request.body);
@@ -138,7 +181,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/properties/:id/publish',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'PUBLISHED', request.user!.id, {
@@ -150,7 +199,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/properties/:id/hide',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'HIDDEN', request.user!.id, {
@@ -162,7 +217,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.delete(
     '/v1/admin/properties/:id',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request, reply) => {
       const params = propertyIdParamSchema.parse(request.params);
       await PropertyService.softDelete(params.id, request.user!.id, {
@@ -174,7 +235,13 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
 
   app.post(
     '/v1/admin/properties/:id/restore',
-    { preHandler: [authenticate, roleGuard(['ADMIN', 'EDITOR']), verifyCsrfToken] },
+    {
+      preHandler: [
+        app.authenticate,
+        roleGuard(['ADMIN', 'EDITOR'] as $Enums.Role[]),
+        verifyCsrfToken
+      ]
+    },
     async (request) => {
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.restore(params.id, request.user!.id, {
