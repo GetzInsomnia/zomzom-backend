@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { clearCsrfCookie, issueCsrfToken } from '../common/middlewares/csrf';
 import { loginSchema } from './schemas';
 import { AuthService } from './service';
+import { ensureIdempotencyKey } from '../common/idempotency';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
@@ -17,6 +18,10 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       }
     },
     async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'auth.login');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const body = loginSchema.parse(request.body);
       const result = await AuthService.login(body.username, body.password, request.ip);
       const csrfToken = issueCsrfToken(reply);
@@ -29,7 +34,11 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     return { user: req.user };
   });
 
-  app.post('/v1/auth/logout', { preHandler: [app.authenticate] }, async (_req, reply) => {
+  app.post('/v1/auth/logout', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const guard = ensureIdempotencyKey(app, 'auth.logout');
+    if (!(await guard(request, reply))) {
+      return;
+    }
     reply.clearCookie('token', { path: '/' });
     return { ok: true };
   });
