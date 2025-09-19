@@ -14,6 +14,7 @@ import { registerSchedulerRoutes } from './modules/scheduler/routes';
 import { registerBackupRoutes } from './modules/backup/routes';
 import { registerIndexRoutes } from './modules/index/routes';
 import { registerSuggestRoutes } from './modules/suggest/routes';
+import { registerCatalogRoutes } from './modules/catalog/routes';
 import { SchedulerService } from './modules/scheduler/service';
 
 export async function createServer() {
@@ -66,6 +67,7 @@ export async function createServer() {
   await registerBackupRoutes(app);
   await registerIndexRoutes(app);
   await registerSuggestRoutes(app);
+  await registerCatalogRoutes(app);
 
   // Background scheduler (กันล้มตอนเริ่ม)
   try {
