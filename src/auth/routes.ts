@@ -1,7 +1,7 @@
 /// <reference path="../global.d.ts" />
 import type { FastifyPluginAsync } from 'fastify';
 import { clearCsrfCookie, issueCsrfToken } from '../common/middlewares/csrf';
-import { loginSchema } from './schemas';
+import { loginSchema, verifyEmailQuerySchema } from './schemas';
 import { AuthService } from './service';
 import {
   REFRESH_COOKIE_NAME,
@@ -13,6 +13,7 @@ import {
 } from './token';
 import { ensureIdempotencyKey } from '../common/idempotency';
 import { prisma } from '../prisma/client';
+import { EmailVerificationService } from './emailVerification.service';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
@@ -71,6 +72,56 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
     clearRefreshCookie(reply);
     return { ok: true };
+  });
+
+  app.post(
+    '/v1/auth/send-verify-email',
+    {
+      preHandler: [app.authenticate],
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: 60 * 60 * 1000,
+          keyGenerator: (request) => request.headers.authorization ?? request.ip
+        }
+      }
+    },
+    async (request, reply) => {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'UNAUTHORIZED' });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: request.user.id },
+        select: { id: true, isActive: true }
+      });
+
+      if (!user) {
+        return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+      }
+
+      if (user.isActive) {
+        return reply.send({ ok: true, alreadyVerified: true });
+      }
+
+      const { token, expiresAt } = await EmailVerificationService.issueToken(user.id);
+
+      // TODO: Integrate email delivery to send `token` to the user's email address.
+      request.log.info(
+        { userId: user.id, expiresAt: expiresAt.toISOString() },
+        'Email verification token issued'
+      );
+
+      return reply.send({ ok: true, alreadyVerified: false });
+    }
+  );
+
+  app.get('/v1/auth/verify-email', async (request, reply) => {
+    const { token } = verifyEmailQuerySchema.parse(request.query);
+
+    await EmailVerificationService.consumeToken(token);
+
+    return reply.send({ ok: true });
   });
 
   app.post('/v1/auth/refresh', async (request, reply) => {
