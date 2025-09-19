@@ -2,5 +2,5 @@
 
 - Frontend page /adminmanager: ❌
 
-## Backend admin-related files (by name match)
+## Backend admin-related files (name match)
 - (none)
