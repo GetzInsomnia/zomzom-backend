@@ -16,7 +16,8 @@ async function main() {
     create: {
       username: 'admin',
       passwordHash,
-      isActive: true
+      isActive: true,
+      tokenVersion: 0
     }
   });
 }

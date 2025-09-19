@@ -1161,7 +1161,8 @@ async function seedAdminUser() {
     create: {
       username: 'admin',
       passwordHash,
-      role: Role.ADMIN
+      role: Role.ADMIN,
+      tokenVersion: 0
     }
   });
 }

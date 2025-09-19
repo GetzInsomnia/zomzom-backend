@@ -46,7 +46,8 @@ export class AuthService {
               username,
               passwordHash,
               role: 'ADMIN',
-              isActive: true
+              isActive: true,
+              tokenVersion: 0
             }
           });
         } else {
