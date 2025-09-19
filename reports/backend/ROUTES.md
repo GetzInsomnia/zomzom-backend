@@ -1,8 +1,8 @@
 # ROUTES
 
-## Backend (Fastify) routes (static scan)
+## Backend (Fastify) — static scan
 
-| Method | Path | File |
+| Method | Path/Url | File |
 |---|---|---|
 | POST | `/v1/auth/login` | `src/auth/routes.ts` |
 | GET | `/v1/auth/me` | `src/auth/routes.ts` |
@@ -38,7 +38,3 @@
 | GET | `/v1/schedule/jobs` | `src/modules/scheduler/routes.ts` |
 | GET | `/api/suggest` | `src/modules/suggest/routes.ts` |
 | GET | `/health` | `src/server.ts` |
-| REGISTER | `helmet` | `src/server.ts` |
-| REGISTER | `cookie` | `src/server.ts` |
-| REGISTER | `rateLimit` | `src/server.ts` |
-| REGISTER | `cors` | `src/server.ts` |

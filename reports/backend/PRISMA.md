@@ -7,7 +7,7 @@
 - **PropertyType**: HOUSE, TOWNHOME, COMMERCIAL, TWINHOUSE, AFFORDABLE, FLAT, CONDO, ROOM, LAND, COURSE, FORM, OTHER
 - **PropertyStatus**: AVAILABLE, RESERVED, SOLD
 
-## Models & fields (raw)
+## Models (raw)
 
 ### User
 ```

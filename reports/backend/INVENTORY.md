@@ -3,27 +3,25 @@
 **Repo**: zomzom-backend  |  **Version**: 0.1.0  |  **Type**:  Backend(Fastify/Prisma)
 
 ## File type counts (top 20)
-
-- `.ts`: 38
+- `.ts`: 40
+- `.md`: 10
 - `(noext)`: 6
-- `.json`: 3
-- `.sql`: 2
+- `.json`: 6
 - `.js`: 2
 - `.yml`: 1
+- `.sql`: 1
 - `.toml`: 1
 - `.prisma`: 1
-- `.md`: 1
 
 ## Tree (depth=3)
 ```
 ├─ prisma
 │  ├─ migrations
-│  │  ├─ 20241009120000_property_enhancements
-│  │  │  └─ migration.sql
-│  │  ├─ 20241010120000_backend_hotfix_v6_1
+│  │  ├─ 000_init
 │  │  │  └─ migration.sql
 │  │  └─ migration_lock.toml
 │  ├─ schema.prisma
+│  ├─ seed.light.ts
 │  └─ seed.ts
 ├─ public
 │  ├─ data
@@ -33,11 +31,22 @@
 │     └─ .gitkeep
 ├─ reports
 │  └─ backend
+│     ├─ ADMIN.md
+│     ├─ BUILD.json
+│     ├─ ENV.md
+│     ├─ I18N.md
+│     ├─ INVENTORY.md
+│     ├─ PERFORMANCE.md
+│     ├─ PRISMA.md
+│     ├─ ROUTES.md
+│     ├─ SECURITY.md
+│     └─ SEO.md
 ├─ scripts
 │  ├─ generate-initial-migration.js
 │  └─ xray-lite.js
 ├─ src
 │  ├─ auth
+│  │  ├─ jwt.ts
 │  │  ├─ routes.ts
 │  │  ├─ schemas.ts
 │  │  └─ service.ts
@@ -86,6 +95,7 @@
 │  ├─ prisma
 │  │  ├─ client.ts
 │  │  └─ types.ts
+│  ├─ t
 │  ├─ types
 │  │  └─ fastify.d.ts
 │  ├─ env.ts
@@ -98,6 +108,8 @@
 ├─ package-lock.json
 ├─ package.json
 ├─ README.md
+├─ tsconfig.base.json
+├─ tsconfig.build.json
 └─ tsconfig.json
 
 ```

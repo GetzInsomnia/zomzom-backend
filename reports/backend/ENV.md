@@ -7,7 +7,7 @@
 - ❌ .env.development
 - ❌ .env.production
 
-## src/env.ts (detected)
+## src/env.ts keys (best-effort)
 
 | Key | Type/Default |
 |---|---|

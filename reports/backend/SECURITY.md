@@ -4,3 +4,4 @@
 - Helmet: ✅
 - CORS: ✅
 - Rate limit: ✅
+- /health route: ✅

@@ -12,7 +12,7 @@
     "generate": "prisma generate",
     "migrate:init": "node scripts/generate-initial-migration.js",
     "seed": "ts-node prisma/seed.ts",
-    "seed:light": "ts-node prisma/seed.light.ts"
+    "seed:light": "ts-node -r dotenv/config prisma/seed.light.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^8.3.0",
