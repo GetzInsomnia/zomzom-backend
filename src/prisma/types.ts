@@ -1,10 +1,34 @@
 export type Role = 'ADMIN' | 'EDITOR' | 'AGENT' | 'USER';
 
-export type PropertyFlag = 'FEATURED' | 'HIGHLIGHTED' | 'URGENT';
+export type PropertyFlag =
+  | 'NEGOTIABLE'
+  | 'SPECIAL_PRICE'
+  | 'NET_PRICE'
+  | 'MEET_IN_PERSON'
+  | 'NO_LIEN'
+  | 'LIENED';
 
 export type PropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD';
-export type PropertyType = 'CONDO' | 'HOUSE' | 'LAND' | 'COMMERCIAL';
-export type WorkflowState = 'DRAFT' | 'REVIEW' | 'SCHEDULED' | 'PUBLISHED' | 'HIDDEN';
+export type PropertyType =
+  | 'HOUSE'
+  | 'TOWNHOME'
+  | 'COMMERCIAL'
+  | 'TWINHOUSE'
+  | 'AFFORDABLE'
+  | 'FLAT'
+  | 'CONDO'
+  | 'ROOM'
+  | 'LAND'
+  | 'COURSE'
+  | 'FORM'
+  | 'OTHER';
+export type WorkflowState =
+  | 'DRAFT'
+  | 'REVIEW'
+  | 'SCHEDULED'
+  | 'PUBLISHED'
+  | 'HIDDEN'
+  | 'ARCHIVED';
 
 export interface Location {
   id: string;
@@ -45,6 +69,7 @@ export interface Property {
   area: number | null;
   beds: number | null;
   baths: number | null;
+  furnished: boolean | null;
   locationId: string | null;
   reservedUntil: Date | null;
   deposit: boolean;
@@ -53,6 +78,7 @@ export interface Property {
   publishedAt: Date | null;
   scheduledAt: Date | null;
   hiddenAt: Date | null;
+  isHidden: boolean;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -66,6 +92,7 @@ export interface Property {
 }
 
 export interface PropertyFlagOnProperty {
+  id: string;
   propertyId: string;
   flag: PropertyFlag;
   assignedAt: Date;
@@ -104,7 +131,7 @@ export interface ArticleI18N {
   articleId: string;
   locale: string;
   title: string;
-  body: unknown;
+  body: string | null;
 }
 
 export interface Article {
@@ -112,11 +139,13 @@ export interface Article {
   slug: string;
   workflowState: WorkflowState;
   workflowChangedAt: Date;
+  published: boolean;
   publishedAt: Date | null;
   scheduledAt: Date | null;
   hiddenAt: Date | null;
   deletedAt: Date | null;
   updatedAt: Date;
+  createdAt: Date;
   i18n: ArticleI18N[];
 }
 

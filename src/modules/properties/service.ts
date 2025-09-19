@@ -1,4 +1,3 @@
-import { Prisma, WorkflowState } from '@prisma/client';
 import { prisma } from '../../prisma/client';
 import { createAuditLog } from '../../common/utils/audit';
 import { httpError } from '../../common/utils/httpErrors';
@@ -7,6 +6,10 @@ import { IndexService } from '../index/service';
 import { ProcessedImage } from '../uploads/service';
 import { PaginatedResult, PropertyWithRelations } from './dto';
 import { PropertyCreateInput, PropertyQueryInput, PropertyUpdateInput } from './schemas';
+import { WorkflowState } from '../../prisma/types';
+
+type PropertyWhere = Record<string, any>;
+type IntFilter = { gte?: number; lte?: number };
 
 const SOFT_DELETE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -21,7 +24,7 @@ export class PropertyService {
     const pageSize = Number(filters.pageSize ?? 20);
     const skip = (page - 1) * pageSize;
 
-    const where: Prisma.PropertyWhereInput = {};
+    const where: PropertyWhere = {};
 
     if (filters.status) {
       where.status = filters.status;
@@ -32,7 +35,7 @@ export class PropertyService {
     }
 
     if (filters.priceMin !== undefined || filters.priceMax !== undefined) {
-      const priceFilter: Prisma.IntFilter = {};
+      const priceFilter: IntFilter = {};
       if (filters.priceMin !== undefined) {
         priceFilter.gte = filters.priceMin;
       }
@@ -43,13 +46,11 @@ export class PropertyService {
     }
 
     if (filters.province) {
-      const provinceFilter: any = {
-        contains: filters.province,
-        mode: 'insensitive'
-      };
       where.location = {
         is: {
-          province: provinceFilter
+          province: {
+            contains: filters.province
+          }
         }
       };
     }
@@ -93,7 +94,7 @@ export class PropertyService {
   }
 
   static async getProperty(id: string, options: PropertyServiceOptions = {}): Promise<PropertyWithRelations> {
-    const where: Prisma.PropertyWhereInput = { id };
+    const where: PropertyWhere = { id };
     this.applyVisibilityFilters(where, options.preview);
 
     const property = await prisma.property.findFirst({
@@ -135,6 +136,7 @@ export class PropertyService {
 
       const workflowState = (input.workflowState as WorkflowState | undefined) ?? 'PUBLISHED';
       const workflowData = this.buildWorkflowStateData(workflowState);
+      const { isHidden: workflowHidden, ...restWorkflowData } = workflowData;
 
       const created = await tx.property.create({
         data: {
@@ -145,10 +147,12 @@ export class PropertyService {
           area: input.area ?? null,
           beds: input.beds ?? null,
           baths: input.baths ?? null,
+          furnished: input.furnished === undefined ? undefined : input.furnished,
           locationId,
           reservedUntil: input.reservedUntil ?? null,
           deposit: input.deposit ?? false,
-          ...workflowData,
+          isHidden: input.isHidden ?? workflowHidden,
+          ...restWorkflowData,
           i18n: {
             create: input.i18n.map((entry) => ({
               locale: entry.locale,
@@ -238,9 +242,11 @@ export class PropertyService {
           area: input.area === undefined ? undefined : input.area,
           beds: input.beds === undefined ? undefined : input.beds,
           baths: input.baths === undefined ? undefined : input.baths,
+          furnished: input.furnished === undefined ? undefined : input.furnished,
           locationId,
           reservedUntil: input.reservedUntil === undefined ? undefined : input.reservedUntil,
           deposit: input.deposit === undefined ? undefined : input.deposit,
+          isHidden: input.isHidden === undefined ? undefined : input.isHidden,
           i18n: input.i18n
             ? {
                 deleteMany: { propertyId: id },
@@ -344,7 +350,8 @@ export class PropertyService {
           workflowState: 'HIDDEN',
           workflowChangedAt: new Date(),
           hiddenAt: new Date(),
-          scheduledAt: null
+          scheduledAt: null,
+          isHidden: true
         }
       });
 
@@ -501,7 +508,8 @@ export class PropertyService {
     const now = new Date();
     const data: Record<string, any> = {
       workflowState: state,
-      workflowChangedAt: now
+      workflowChangedAt: now,
+      isHidden: state === 'HIDDEN' || state === 'ARCHIVED'
     };
 
     switch (state) {
@@ -509,6 +517,7 @@ export class PropertyService {
         data.publishedAt = now;
         data.scheduledAt = null;
         data.hiddenAt = null;
+        data.isHidden = false;
         break;
       case 'SCHEDULED':
         if (!options.scheduledAt) {
@@ -517,22 +526,30 @@ export class PropertyService {
         data.scheduledAt = options.scheduledAt;
         data.hiddenAt = null;
         data.publishedAt = null;
+        data.isHidden = false;
         break;
       case 'HIDDEN':
         data.hiddenAt = now;
         data.scheduledAt = null;
+        data.publishedAt = null;
+        break;
+      case 'ARCHIVED':
+        data.hiddenAt = now;
+        data.scheduledAt = null;
+        data.publishedAt = null;
         break;
       default:
         data.scheduledAt = null;
         data.hiddenAt = null;
         data.publishedAt = null;
+        data.isHidden = false;
         break;
     }
 
     return data;
   }
 
-  private static applyVisibilityFilters(where: Prisma.PropertyWhereInput, preview?: boolean) {
+  private static applyVisibilityFilters(where: PropertyWhere, preview?: boolean) {
     if (preview) {
       const retentionCutoff = new Date(Date.now() - SOFT_DELETE_RETENTION_MS);
       const existingAnd = Array.isArray(where.AND)
@@ -551,5 +568,6 @@ export class PropertyService {
 
     where.workflowState = 'PUBLISHED';
     where.deletedAt = null;
+    where.isHidden = false;
   }
 }

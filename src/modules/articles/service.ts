@@ -1,10 +1,12 @@
-import { Prisma, WorkflowState } from '@prisma/client';
 import { prisma } from '../../prisma/client';
 import { createAuditLog } from '../../common/utils/audit';
 import { httpError } from '../../common/utils/httpErrors';
 import { isWithinRetention } from '../../common/utils/preview';
 import { IndexService } from '../index/service';
 import { ArticleCreateInput, ArticleUpdateInput } from './schemas';
+import { WorkflowState } from '../../prisma/types';
+
+type ArticleWhere = Record<string, any>;
 
 type ArticleServiceOptions = {
   skipIndexRebuild?: boolean;
@@ -17,7 +19,7 @@ const SOFT_DELETE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export class ArticleService {
   static async getBySlug(slug: string, options: ArticleVisibilityOptions = {}) {
-    const where: Prisma.ArticleWhereInput = { slug };
+    const where: ArticleWhere = { slug };
     this.applyVisibilityFilters(where, options.preview);
 
     const article = await prisma.article.findFirst({
@@ -38,12 +40,14 @@ export class ArticleService {
     const workflowState = (input.workflowState as WorkflowState | undefined)
       ?? (input.published ? 'PUBLISHED' : 'DRAFT');
     const workflowData = this.buildWorkflowStateData(workflowState);
+    const { published: workflowPublished, ...restWorkflowData } = workflowData;
 
     const article = await prisma.$transaction(async (tx: any) => {
       const created = await tx.article.create({
         data: {
           slug: input.slug,
-          ...workflowData,
+          ...restWorkflowData,
+          published: workflowPublished,
           i18n: {
             create: input.i18n.map((entry) => ({
               locale: entry.locale,
@@ -87,12 +91,14 @@ export class ArticleService {
         input.published !== undefined
           ? this.buildWorkflowStateData(input.published ? 'PUBLISHED' : 'DRAFT')
           : undefined;
+      const { published: workflowPublished, ...restWorkflowData } = workflowData ?? {};
 
       const updated = await tx.article.update({
         where: { id },
         data: {
           slug: input.slug ?? existing.slug,
-          ...(workflowData ?? {}),
+          ...(restWorkflowData ?? {}),
+          published: workflowPublished ?? existing.published,
           i18n: input.i18n
             ? {
                 deleteMany: { articleId: id },
@@ -187,7 +193,8 @@ export class ArticleService {
           workflowState: 'HIDDEN',
           workflowChangedAt: new Date(),
           hiddenAt: new Date(),
-          scheduledAt: null
+          scheduledAt: null,
+          published: false
         }
       });
 
@@ -255,7 +262,8 @@ export class ArticleService {
     const now = new Date();
     const data: Record<string, any> = {
       workflowState: state,
-      workflowChangedAt: now
+      workflowChangedAt: now,
+      published: state === 'PUBLISHED'
     };
 
     switch (state) {
@@ -263,6 +271,7 @@ export class ArticleService {
         data.publishedAt = now;
         data.scheduledAt = null;
         data.hiddenAt = null;
+        data.published = true;
         break;
       case 'SCHEDULED':
         if (!options.scheduledAt) {
@@ -271,22 +280,32 @@ export class ArticleService {
         data.scheduledAt = options.scheduledAt;
         data.hiddenAt = null;
         data.publishedAt = null;
+        data.published = false;
         break;
       case 'HIDDEN':
         data.hiddenAt = now;
         data.scheduledAt = null;
+        data.publishedAt = null;
+        data.published = false;
+        break;
+      case 'ARCHIVED':
+        data.hiddenAt = now;
+        data.scheduledAt = null;
+        data.publishedAt = null;
+        data.published = false;
         break;
       default:
         data.scheduledAt = null;
         data.hiddenAt = null;
         data.publishedAt = null;
+        data.published = false;
         break;
     }
 
     return data;
   }
 
-  private static applyVisibilityFilters(where: Prisma.ArticleWhereInput, preview?: boolean) {
+  private static applyVisibilityFilters(where: ArticleWhere, preview?: boolean) {
     if (preview) {
       const retentionCutoff = new Date(Date.now() - SOFT_DELETE_RETENTION_MS);
       const existingAnd = Array.isArray(where.AND)
@@ -305,5 +324,6 @@ export class ArticleService {
 
     where.workflowState = 'PUBLISHED';
     where.deletedAt = null;
+    where.published = true;
   }
 }
