@@ -15,9 +15,12 @@ enum Role {
 }
 
 enum PropertyFlag {
-  FEATURED
-  HIGHLIGHTED
-  URGENT
+  NEGOTIABLE
+  SPECIAL_PRICE
+  NET_PRICE
+  MEET_IN_PERSON
+  NO_LIEN
+  LIENED
 }
 
 enum WorkflowState {
@@ -26,13 +29,22 @@ enum WorkflowState {
   SCHEDULED
   PUBLISHED
   HIDDEN
+  ARCHIVED
 }
 
 enum PropertyType {
-  CONDO
   HOUSE
-  LAND
+  TOWNHOME
   COMMERCIAL
+  TWINHOUSE
+  AFFORDABLE
+  FLAT
+  CONDO
+  ROOM
+  LAND
+  COURSE
+  FORM
+  OTHER
 }
 
 enum PropertyStatus {
@@ -46,9 +58,10 @@ model User {
   username     String    @unique
   passwordHash String
   role         Role      @default(ADMIN)
-  localePref   String    @default("en")
+  localePref   String?   // admin UI locale
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   auditLogs    AuditLog[]
   changeSets   ChangeSet[] @relation("ChangeSetCreatedBy")
   favorites    Favorite[]
@@ -63,6 +76,7 @@ model Property {
   area            Float?
   beds            Int?
   baths           Int?
+  furnished       Boolean?               @default(false)
   locationId      String?
   location        Location?              @relation(fields: [locationId], references: [id])
   createdAt       DateTime               @default(now())
@@ -74,6 +88,7 @@ model Property {
   publishedAt     DateTime?
   scheduledAt     DateTime?
   hiddenAt        DateTime?
+  isHidden        Boolean                @default(false)
   deletedAt       DateTime?
   images          PropertyImage[]
   i18n            PropertyI18N[]
@@ -84,6 +99,7 @@ model Property {
 
   @@index([status, type, price])
   @@index([status, type, updatedAt])
+  @@index([status, type, price, updatedAt])
   @@index([locationId])
 }
 
@@ -96,6 +112,7 @@ model PropertyImage {
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([propertyId, order])
+  @@index([propertyId, order])
 }
 
 model PropertyI18N {
@@ -108,6 +125,7 @@ model PropertyI18N {
   property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([propertyId, locale])
+  @@index([locale, propertyId])
 }
 
 model Article {
@@ -115,11 +133,13 @@ model Article {
   slug       String        @unique
   workflowState WorkflowState @default(DRAFT)
   workflowChangedAt DateTime  @default(now())
+  published  Boolean       @default(false)
   publishedAt DateTime?
   scheduledAt DateTime?
   hiddenAt   DateTime?
   deletedAt  DateTime?
   updatedAt  DateTime      @updatedAt
+  createdAt  DateTime      @default(now())
   i18n       ArticleI18N[]
 }
 
@@ -128,7 +148,7 @@ model ArticleI18N {
   articleId String
   locale    String
   title     String
-  body      Json
+  body      String? @db.LongText
   article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 }
 
@@ -184,15 +204,17 @@ model Location {
   properties Property[]
 
   @@index([province])
+  @@index([province, district])
 }
 
 model PropertyFlagOnProperty {
+  id         String        @id @default(cuid())
   propertyId String
   flag       PropertyFlag
-  assignedAt DateTime  @default(now())
-  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  assignedAt DateTime      @default(now())
+  property   Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
-  @@id([propertyId, flag])
+  @@unique([propertyId, flag])
 }
 
 model Favorite {

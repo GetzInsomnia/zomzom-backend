@@ -3,10 +3,10 @@ import { z } from 'zod';
 const articleI18nSchema = z.object({
   locale: z.string().min(2),
   title: z.string().min(1),
-  body: z.any()
+  body: z.string().optional().nullable()
 });
 
-export const workflowStateEnum = z.enum(['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'HIDDEN']);
+export const workflowStateEnum = z.enum(['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'HIDDEN', 'ARCHIVED']);
 
 export const articleCreateSchema = z.object({
   slug: z.string().min(1),

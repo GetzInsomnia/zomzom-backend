@@ -1,10 +1,10 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import MiniSearch from 'minisearch';
-import { PropertyType } from '@prisma/client';
 import { prisma } from '../../prisma/client';
 import { env } from '../../env';
 import { ensureDir } from '../../common/utils/file';
+import { PropertyType } from '../../prisma/types';
 
 type SupportedLocale = 'th' | 'en' | 'zh';
 
@@ -81,6 +81,7 @@ export class IndexService {
           deletedAt: null
         },
         include: {
+          images: { orderBy: { order: 'asc' } },
           i18n: true,
           location: true
         }

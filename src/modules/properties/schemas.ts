@@ -16,8 +16,21 @@ const propertyI18nSchema = z.object({
 });
 
 const statusEnum = z.enum(['AVAILABLE', 'RESERVED', 'SOLD']);
-const typeEnum = z.enum(['CONDO', 'HOUSE', 'LAND', 'COMMERCIAL']);
-export const workflowStateEnum = z.enum(['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'HIDDEN']);
+const typeEnum = z.enum([
+  'HOUSE',
+  'TOWNHOME',
+  'COMMERCIAL',
+  'TWINHOUSE',
+  'AFFORDABLE',
+  'FLAT',
+  'CONDO',
+  'ROOM',
+  'LAND',
+  'COURSE',
+  'FORM',
+  'OTHER'
+]);
+export const workflowStateEnum = z.enum(['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'HIDDEN', 'ARCHIVED']);
 
 const nullablePositive = z.union([z.number().positive(), z.null()]);
 const nullableInt = z.union([z.number().int().nonnegative(), z.null()]);
@@ -35,6 +48,8 @@ export const propertyCreateSchema = z
     location: locationSchema.optional(),
     reservedUntil: z.union([z.coerce.date(), z.null()]).optional(),
     deposit: z.boolean().optional(),
+    furnished: z.boolean().optional().nullable(),
+    isHidden: z.boolean().optional(),
     workflowState: workflowStateEnum.optional(),
     i18n: z.array(propertyI18nSchema).min(1)
   })
@@ -56,6 +71,8 @@ export const propertyUpdateSchema = z
     location: locationSchema.optional(),
     reservedUntil: z.union([z.coerce.date(), z.null()]).optional(),
     deposit: z.boolean().optional(),
+    furnished: z.boolean().optional().nullable(),
+    isHidden: z.boolean().optional(),
     i18n: z.array(propertyI18nSchema).min(1).optional()
   })
   .refine((data) => !(data.location && data.locationId), {
