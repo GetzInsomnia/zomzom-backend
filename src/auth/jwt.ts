@@ -9,10 +9,13 @@ import type {
 import jwt from 'jsonwebtoken';
 import type { $Enums } from '@prisma/client';
 
+import { prisma } from '../prisma/client';
+
 type UserClaims = {
   sub: string;
   username: string;
   role: $Enums.Role; // Prisma enum
+  v?: number;
   iat?: number;
   exp?: number;
 };
@@ -33,10 +36,27 @@ const jwtPlugin: FastifyPluginAsync = async (app) => {
       const token = auth.slice(7);
 
       const decoded = jwt.verify(token, secret) as UserClaims;
+
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.sub },
+        select: {
+          id: true,
+          username: true,
+          role: true,
+          isActive: true,
+          tokenVersion: true
+        }
+      });
+
+      if (!user || !user.isActive) throw new Error('User inactive or missing');
+      if (typeof decoded.v === 'number' && user.tokenVersion !== decoded.v) {
+        throw new Error('Token version mismatch');
+      }
+
       req.user = {
-        id: decoded.sub,
-        username: decoded.username,
-        role: decoded.role
+        id: user.id,
+        username: user.username,
+        role: user.role
       };
     } catch {
       return reply.code(401).send({ error: 'UNAUTHORIZED' });
