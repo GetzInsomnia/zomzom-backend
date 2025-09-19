@@ -4,6 +4,7 @@ import { roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { scheduleCreateSchema, scheduleJobsQuerySchema } from './schemas';
 import { SchedulerService } from './service';
+import { ensureIdempotencyKey } from '../../common/idempotency';
 
 export async function registerSchedulerRoutes(app: FastifyInstance) {
   app.post(
@@ -16,6 +17,10 @@ export async function registerSchedulerRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'schedule.create');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const body = scheduleCreateSchema.parse(request.body);
       const result = await SchedulerService.createSchedule(body, request.user!.id, request.ip);
       reply.code(201);

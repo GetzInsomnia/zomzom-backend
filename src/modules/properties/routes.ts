@@ -3,6 +3,7 @@ import type { $Enums } from '@prisma/client';
 import { roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { resolvePreviewMode } from '../../common/utils/preview';
+import { ensureIdempotencyKey } from '../../common/idempotency';
 import {
   PropertyFilters,
   ZPropertyFiltersBase,
@@ -56,6 +57,10 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.create');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const body = propertyCreateSchema.parse(request.body);
       const property = await PropertyService.createProperty(body, request.user!.id, {
         ipAddress: request.ip
@@ -74,7 +79,11 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.update');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const body = propertyUpdateSchema.parse(request.body);
       const property = await PropertyService.updateProperty(params.id, body, request.user!.id, {
@@ -94,6 +103,10 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.images.add');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const files = await UploadService.parseImageRequest(request);
       const processed = await UploadService.processPropertyImages(params.id, files);
@@ -115,6 +128,10 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.images.remove');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyImageParamSchema.parse(request.params);
       await PropertyService.removeImage(params.id, params.imageId, request.user!.id, {
         ipAddress: request.ip
@@ -132,7 +149,11 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.workflow.draft');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'DRAFT', request.user!.id, {
         ipAddress: request.ip
@@ -150,7 +171,11 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.workflow.review');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'REVIEW', request.user!.id, {
         ipAddress: request.ip
@@ -168,7 +193,11 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.workflow.schedule');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const body = propertyScheduleTransitionSchema.parse(request.body);
       const property = await PropertyService.transitionState(params.id, 'SCHEDULED', request.user!.id, {
@@ -188,7 +217,11 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.workflow.publish');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'PUBLISHED', request.user!.id, {
         ipAddress: request.ip
@@ -206,7 +239,11 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.workflow.hide');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.transitionState(params.id, 'HIDDEN', request.user!.id, {
         ipAddress: request.ip
@@ -225,6 +262,10 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.delete');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       await PropertyService.softDelete(params.id, request.user!.id, {
         ipAddress: request.ip
@@ -242,7 +283,11 @@ export async function registerPropertyRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'properties.restore');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const params = propertyIdParamSchema.parse(request.params);
       const property = await PropertyService.restore(params.id, request.user!.id, {
         ipAddress: request.ip
