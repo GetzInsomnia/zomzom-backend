@@ -1,6 +1,6 @@
 import { FastifyRequest } from 'fastify';
 import { httpError } from './httpErrors';
-import { getUserFromRequest } from '../middlewares/authGuard';
+import { getUserFromRequest } from './requestUser';
 
 const PREVIEW_HEADER = 'x-preview-mode';
 

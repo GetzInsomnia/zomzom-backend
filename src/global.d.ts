@@ -7,8 +7,9 @@ declare module 'fastify' {
     user?: {
       id: string;
       username: string;
-      role: $Enums.Role;  // Prisma enum
+      role: $Enums.Role; // Prisma enum
     };
+    previewMode?: boolean;
   }
 
   interface FastifyInstance {
