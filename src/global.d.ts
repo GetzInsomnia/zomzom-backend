@@ -9,8 +9,6 @@ declare module 'fastify' {
       username: string;
       role: $Enums.Role;  // Prisma enum
     };
-    previewMode?: boolean;
-    cookies: Record<string, string | undefined>;
   }
 
   interface FastifyInstance {
