@@ -3,8 +3,8 @@
 **Repo**: zomzom-backend  |  **Version**: 0.1.0  |  **Type**:  Backend(Fastify/Prisma)
 
 ## File type counts (top 20)
-- `.ts`: 41
-- `.md`: 13
+- `.ts`: 42
+- `.md`: 14
 - `(noext)`: 6
 - `.json`: 6
 - `.js`: 2
@@ -34,6 +34,7 @@
 │     ├─ ADMIN.md
 │     ├─ API_WIRING.md
 │     ├─ BUILD.json
+│     ├─ CHECKS.md
 │     ├─ ENV.md
 │     ├─ FASTIFY_TYPES.md
 │     ├─ I18N.md
@@ -103,6 +104,7 @@
 │  ├─ types
 │  │  └─ fastify.d.ts
 │  ├─ env.ts
+│  ├─ global.d.ts
 │  └─ server.ts
 ├─ .editorconfig
 ├─ .env

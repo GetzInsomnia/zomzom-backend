@@ -294,6 +294,34 @@ function extractZodEnvKeys(src){
   write('FASTIFY_TYPES.md', lines.join('\n'));
 })();
 
+// ---------- ROUTE_GUARDS ----------
+(function(){
+  const lines=['# ROUTE_GUARDS',''];
+  const srcDir = path.join(ROOT,'src');
+  const files = exists(srcDir) ? walk(srcDir).filter(f => /[\\/]modules[\\/].+?[\\/]routes\.ts$/.test(f)) : [];
+  const badImports = [];
+  const bareAuth = [];
+
+  for(const f of files){
+    const s = read(f) || '';
+    if (/import\s*\{\s*authenticate\s*\}\s*from\s*['"][^'"]*authGuard['"]/.test(s)) {
+      badImports.push(f);
+    }
+    if (/\bpreHandler\s*:\s*\[?\s*authenticate\b/.test(s)) {
+      bareAuth.push(f);
+    }
+  }
+
+  lines.push(`- No route file imports { authenticate } from authGuard: ${badImports.length===0?'✅':'❌'}`);
+  badImports.forEach(f => lines.push('  - ' + rel(f)));
+
+  lines.push(`- Use app.authenticate (not bare "authenticate") in preHandler: ${bareAuth.length===0?'✅':'❌'}`);
+  bareAuth.forEach(f => lines.push('  - ' + rel(f)));
+
+  write('ROUTE_GUARDS.md', lines.join('\n'));
+})();
+
+
 // ---------- API_WIRING ----------
 (function(){
   const lines=['# API_WIRING',''];
@@ -370,6 +398,73 @@ function extractZodEnvKeys(src){
   write('CHECKS.md', lines.join('\n'));
 })();
 
+// ---------- CHECKS (pre-dev) ----------
+(function () {
+  const lines = ['# CHECKS (pre-dev)', ''];
+
+  // .env existence & keys
+  const envPath = path.join(ROOT, '.env');
+  const hasEnv = exists(envPath);
+  lines.push(`- ${hasEnv ? '✅' : '❌'} .env file present`);
+  let envContent = hasEnv ? read(envPath, 256 * 1024) : '';
+  const needKeys = ['DATABASE_URL', 'JWT_SECRET', 'CORS_ORIGIN'];
+  for (const k of needKeys) {
+    const ok = hasEnv && new RegExp(`^${k}=`, 'm').test(envContent || '');
+    if (k === 'JWT_SECRET' && ok) {
+      const m = (envContent || '').match(/^JWT_SECRET=(.+)$/m);
+      const len = m ? (m[1] || '').trim().length : 0;
+      lines.push(`- ${len >= 32 ? '✅' : '❌'} JWT_SECRET present (>=32 chars) — length=${len}`);
+    } else {
+      lines.push(`- ${ok ? '✅' : '❌'} ${k} present`);
+    }
+  }
+
+  // server.ts presence & plugin order
+  const serverSrc = exists(serverTsPath) ? read(serverTsPath, 512 * 1024) : '';
+  lines.push(`- ${serverSrc ? '✅' : '❌'} src/server.ts exists`);
+  if (serverSrc) {
+    const hasImportAug = /import\s+['"]\.\/types\/fastify['"]/.test(serverSrc || '');
+    lines.push(`- import './types/fastify' in server.ts: ${hasImportAug ? '✅' : '❌'}`);
+
+    const hasHelmet = /@fastify\/helmet/.test(serverSrc || '');
+    const hasCors = /@fastify\/cors/.test(serverSrc || '');
+    const hasRate = /@fastify\/rate-limit/.test(serverSrc || '');
+    const hasHealth = /\/health/.test(serverSrc || '');
+    lines.push(`- helmet/cors/rate-limit registered: ${hasHelmet && hasCors && hasRate ? '✅' : '❌'}`);
+    lines.push(`- /health route exists: ${hasHealth ? '✅' : '❌'}`);
+
+    const idxJwt = (serverSrc || '').indexOf('register(jwtPlugin');
+    const idxAuthRoutes = (serverSrc || '').indexOf('registerAuthRoutes');
+    const orderOk = idxJwt !== -1 && idxAuthRoutes !== -1 && idxJwt < idxAuthRoutes;
+    lines.push(`- jwtPlugin BEFORE registerAuthRoutes: ${orderOk ? '✅' : '❌'}`);
+  }
+
+  // tsconfig include .d.ts
+  const tsconf = readJSON(path.join(ROOT, 'tsconfig.json')) || {};
+  const includes = (tsconf.include || []).join(' | ');
+  const hasDts = /src\/\*\*\/\*\.d\.ts/.test(includes);
+  lines.push(`- tsconfig.include includes .d.ts — include=${hasDts ? '✅' : '❌'} "${includes || '-'}"`);
+
+  // prisma/migrations presence
+  const migDir = path.join(ROOT, 'prisma', 'migrations');
+  const migOk = exists(migDir) && fs.readdirSync(migDir).some(n => n !== 'migration_lock.toml');
+  lines.push(`- prisma/migrations present — ${migOk ? '✅' : '❌'}`);
+
+  // seed.light
+  const seedLight = path.join(ROOT, 'prisma', 'seed.light.ts');
+  lines.push(`- prisma/seed.light.ts present: ${exists(seedLight) ? '✅' : '❌'}`);
+
+  // scripts
+  const pkgJson = readJSON(path.join(ROOT, 'package.json')) || {};
+  const scripts = pkgJson.scripts || {};
+  lines.push(`- package.json script: dev ${scripts.dev ? '✅' : '❌'}`);
+  lines.push(`- package.json script: seed:light ${scripts['seed:light'] ? '✅' : '❌'}`);
+  lines.push(`- package.json script: generate ${scripts.generate ? '✅' : '❌'}`);
+
+  write('CHECKS.md', lines.join('\n'));
+})();
+
+
 // ---------- BUILD.json ----------
 (function(){
   const obj = {
@@ -382,4 +477,84 @@ function extractZodEnvKeys(src){
     detected: { frontend: !!isFrontend, backend: !!isBackend }
   };
   write('BUILD.json', JSON.stringify(obj,null,2));
+})();
+
+// ---------- CHECKLIST (preflight) ----------
+(function () {
+  const lines = ['# CHECKLIST (preflight)', ''];
+
+  // A) ห้าม import .d.ts แบบ runtime
+  const server = path.join(ROOT, 'src', 'server.ts');
+  const serverSrc = exists(server) ? read(server) : '';
+  const badImport = serverSrc && /import\s+['"]\.\/types\/fastify['"]/.test(serverSrc);
+  const typeImport = serverSrc && /import\s+type\s+['"]\.\/types\/fastify['"]/.test(serverSrc);
+
+  lines.push(`- server.ts uses runtime import of .d.ts: ${badImport ? '❌ (fix to import type or remove)' : '✅'}`);
+  lines.push(`- server.ts uses \`import type './types/fastify'\`: ${typeImport ? '✅' : (badImport ? '❌' : '–')}`);
+
+  // B) tsconfig include .d.ts
+  const ts = readJSON(path.join(ROOT, 'tsconfig.json')) || {};
+  const include = (ts.include || []).join(' ');
+  const seesDts = /src\/\*\*\/\*\.d\.ts/.test(include);
+  lines.push(`- tsconfig includes src/**/*.d.ts: ${seesDts ? '✅' : '❌'}`);
+
+  // C) jwtPlugin registered before routes
+  const jwtFirst = serverSrc && /register\(jwtPlugin\)[\s\S]+register\(/.test(serverSrc);
+  lines.push(`- jwtPlugin registered before routes: ${jwtFirst ? '✅' : '❌'}`);
+
+  // D) health route
+  const hasHealth = serverSrc && (/\.get\(\s*['"]\/health['"]/.test(serverSrc) || /url\s*:\s*['"]\/health['"]/.test(serverSrc));
+  lines.push(`- /health route present: ${hasHealth ? '✅' : '❌'}`);
+
+  write('CHECKLIST.md', lines.join('\n'));
+})();
+
+// ---------- FASTIFY AUGMENTATION GUARD ----------
+(function(){
+  const lines=['# FASTIFY_AUGMENTATION_GUARD',''];
+  const srcDir = path.join(ROOT, 'src');
+  const globalDts = path.join(srcDir, 'global.d.ts');
+
+  // A) global.d.ts presence
+  const hasGlobal = exists(globalDts);
+  lines.push(`- src/global.d.ts present: ${hasGlobal ? '✅' : '❌'}`);
+
+  // B) Ensure there is exactly ONE fastify augmentation file
+  const allDts = exists(srcDir) ? walk(srcDir).filter(f => /\.d\.ts$/.test(f)) : [];
+  const augFiles = allDts.filter(f => /declare module ['"]fastify['"]/.test(read(f) || ''));
+  lines.push(`- Fastify augmentation files count (expected 1): ${augFiles.length === 1 ? '✅' : '❌'} (${augFiles.length})`);
+  augFiles.forEach(f => lines.push(`  - ${rel(f)}`));
+  const onlyGlobal = augFiles.length === 1 && augFiles[0] === globalDts;
+  lines.push(`- Augmentation file is src/global.d.ts: ${onlyGlobal ? '✅' : '❌'}`);
+
+  // C) Validate global.d.ts content shape (best-effort)
+  if (hasGlobal) {
+    const s = read(globalDts) || '';
+    const hasUser = /interface\s+FastifyRequest\s*\{[\s\S]*\buser\?\s*:\s*\{[\s\S]*\bid:\s*string;[\s\S]*\busername:\s*string;[\s\S]*\brole:\s*\$Enums\.Role;[\s\S]*\}[\s\S]*\}/m.test(s);
+    const hasAuth = /interface\s+FastifyInstance\s*\{[\s\S]*\bauthenticate\s*:\s*import\(['"]fastify['"]\)\.preHandlerHookHandler;?[\s\S]*\}/m.test(s);
+    lines.push(`- global.d.ts declares FastifyRequest.user: ${hasUser ? '✅' : '❌'}`);
+    lines.push(`- global.d.ts declares FastifyInstance.authenticate: ${hasAuth ? '✅' : '❌'}`);
+  }
+
+  // D) No runtime import of ./types/fastify anywhere
+  const tsFiles = exists(srcDir) ? walk(srcDir).filter(f => /\.(ts|tsx)$/.test(f)) : [];
+  const badRuntime = tsFiles.filter(f => /import\s+['"][.\/]types\/fastify['"]/.test(read(f) || ''));
+  lines.push(`- no runtime imports of ./types/fastify: ${badRuntime.length === 0 ? '✅' : '❌'}`);
+  badRuntime.forEach(f => lines.push(`  - ${rel(f)}`));
+
+  // E) Triple-slash references in critical files (heuristic)
+  const jwtFile = path.join(srcDir, 'auth', 'jwt.ts');
+  const authGuardFile = path.join(srcDir, 'common', 'middlewares', 'authGuard.ts');
+  const jwtSrc = exists(jwtFile) ? read(jwtFile) : '';
+  const guardSrc = exists(authGuardFile) ? read(authGuardFile) : '';
+  const jwtHasTriple = /\/\/\/\s*<reference\s+path="\.\.\/global\.d\.ts"\s*\/>/.test(jwtSrc || '');
+  const guardHasTriple = /\/\/\/\s*<reference\s+path="\.\.\/\.\.\/global\.d\.ts"\s*\/>/.test(guardSrc || '');
+  lines.push(`- jwt.ts triple-slash to ../global.d.ts: ${jwtHasTriple ? '✅' : '❌'}`);
+  lines.push(`- authGuard.ts triple-slash to ../../global.d.ts: ${guardHasTriple ? '✅' : '❌'}`);
+
+  // F) app.decorate & decorateRequest presence (best-effort)
+  const hasDecorate = /decorateRequest\(\s*['"]user['"]/.test(jwtSrc || '') && /decorate\(\s*['"]authenticate['"]/.test(jwtSrc || '');
+  lines.push(`- jwt.ts decorates request.user and instance.authenticate: ${hasDecorate ? '✅' : '❌'}`);
+
+  write('FASTIFY_AUGMENTATION.md', lines.join('\n'));
 })();
