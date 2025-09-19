@@ -1,36 +1,43 @@
+// src/auth/jwt.ts
 import fp from 'fastify-plugin';
-import type { FastifyPluginCallback } from 'fastify';
+import type { FastifyPluginAsync } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { z } from 'zod';
-import { env } from '../env'; // ต้องมี JWT_SECRET ใน env
+import type { $Enums } from '@prisma/client';
 
-// shape ของ payload ที่เราจะฝังใน token
-export type UserClaims = {
-  id: string;
+type UserClaims = {
+  sub: string;       // user id
   username: string;
-  role: string; // ใช้ string ให้ยืดหยุ่น หรือจะเปลี่ยนเป็น Role ก็ได้ถ้าแน่ใจว่าตรง schema
+  role: $Enums.Role; // Prisma enum type
+  iat?: number;
+  exp?: number;
 };
 
-const BearerRx = /^Bearer\s+(.+)$/i;
+const jwtPlugin: FastifyPluginAsync = async (app) => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    app.log.warn('JWT_SECRET is missing or too short (>=32). Auth may fail.');
+  }
 
-const plugin: FastifyPluginCallback = (fastify, _opts, done) => {
-  fastify.decorate('authenticate', async (req, reply) => {
+  app.decorate('authenticate', async (req, reply) => {
     try {
-      const auth = req.headers.authorization || '';
-      const m = auth.match(BearerRx);
-      if (!m) {
-        reply.code(401).send({ error: 'Missing Authorization header' });
-        return;
-      }
-      const token = m[1];
-      const decoded = jwt.verify(token, env.JWT_SECRET) as UserClaims;
-      req.user = decoded;
+      const auth = req.headers.authorization;
+      if (!auth?.startsWith('Bearer ')) throw new Error('Missing Bearer token');
+      const token = auth.slice(7);
+
+      const decoded = jwt.verify(token, secret!) as UserClaims;
+
+      // แน่ใจว่าตรง enum ของ Prisma
+      const role = decoded.role as $Enums.Role;
+
+      req.user = {
+        id: decoded.sub,
+        username: decoded.username,
+        role
+      };
     } catch (err) {
-      reply.code(401).send({ error: 'Invalid token' });
+      return reply.code(401).send({ error: 'Unauthorized' });
     }
   });
-
-  done();
 };
 
-export default fp(plugin, { name: 'jwt-auth' });
+export default fp(jwtPlugin, { name: 'jwt-plugin' });
