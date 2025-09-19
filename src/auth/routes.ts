@@ -3,8 +3,15 @@ import type { FastifyPluginAsync } from 'fastify';
 import { clearCsrfCookie, issueCsrfToken } from '../common/middlewares/csrf';
 import { loginSchema } from './schemas';
 import { AuthService } from './service';
-import { setRefreshCookie, signAccessToken, signRefreshToken } from './token';
+import {
+  REFRESH_COOKIE_NAME,
+  setRefreshCookie,
+  signAccessToken,
+  signRefreshToken,
+  verifyRefresh
+} from './token';
 import { ensureIdempotencyKey } from '../common/idempotency';
+import { prisma } from '../prisma/client';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
@@ -54,5 +61,50 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     }
     reply.clearCookie('token', { path: '/' });
     return { ok: true };
+  });
+
+  app.post('/v1/auth/refresh', async (request, reply) => {
+    const token = request.cookies?.[REFRESH_COOKIE_NAME];
+
+    if (!token) {
+      return reply.code(401).send({ error: 'UNAUTHORIZED' });
+    }
+
+    let payload;
+    try {
+      payload = verifyRefresh(token);
+    } catch (error) {
+      return reply.code(401).send({ error: 'UNAUTHORIZED' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        isActive: true,
+        tokenVersion: true
+      }
+    });
+
+    if (!user || !user.isActive) {
+      return reply.code(403).send({ error: 'FORBIDDEN' });
+    }
+
+    if (user.tokenVersion !== payload.tokenVersion) {
+      return reply.code(403).send({ error: 'FORBIDDEN' });
+    }
+
+    const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
+    const accessToken = signAccessToken({
+      sub: user.id,
+      role: user.role,
+      username: user.username
+    });
+
+    setRefreshCookie(reply, refreshToken);
+
+    return reply.send({ accessToken });
   });
 };
