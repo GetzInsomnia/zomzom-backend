@@ -5,6 +5,7 @@ import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { createAuditLog } from '../../common/utils/audit';
 import { prisma } from '../../prisma/client';
 import { IndexService } from './service';
+import { ensureIdempotencyKey } from '../../common/idempotency';
 
 export async function registerIndexRoutes(app: FastifyInstance) {
   app.post(
@@ -16,7 +17,11 @@ export async function registerIndexRoutes(app: FastifyInstance) {
         verifyCsrfToken
       ]
     },
-    async (request) => {
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'index.rebuild');
+      if (!(await guard(request, reply))) {
+        return;
+      }
       const summary = await IndexService.rebuild();
       await createAuditLog(prisma, {
         userId: request.user!.id,

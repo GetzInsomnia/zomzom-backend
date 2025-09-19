@@ -229,6 +229,17 @@ model Favorite {
   @@unique([userId, propertyId])
 }
 
+model IdemKey {
+  id        String   @id @default(cuid())
+  key       String
+  userId    String   @default("__global__")
+  route     String
+  createdAt DateTime @default(now())
+
+  @@unique([route, key, userId])
+  @@index([route, userId])
+}
+
 model ViewStat {
   id         String   @id @default(cuid())
   propertyId String
