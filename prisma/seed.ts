@@ -1162,7 +1162,9 @@ async function seedAdminUser() {
       username: 'admin',
       passwordHash,
       role: Role.ADMIN,
-      tokenVersion: 0
+      tokenVersion: 0,
+      email: 'admin@example.com',
+      emailVerifiedAt: new Date()
     }
   });
 }

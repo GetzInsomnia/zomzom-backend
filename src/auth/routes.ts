@@ -93,14 +93,14 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
       const user = await prisma.user.findUnique({
         where: { id: request.user.id },
-        select: { id: true, isActive: true }
+        select: { id: true, isActive: true, emailVerifiedAt: true }
       });
 
       if (!user) {
         return reply.code(404).send({ error: 'USER_NOT_FOUND' });
       }
 
-      if (user.isActive) {
+      if (user.emailVerifiedAt || user.isActive) {
         return reply.send({ ok: true, alreadyVerified: true });
       }
 
