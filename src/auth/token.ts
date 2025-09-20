@@ -1,33 +1,38 @@
+import { createHash, randomUUID } from 'crypto';
 import type { FastifyReply } from 'fastify';
 import jwt, { type JwtPayload, type SignOptions } from 'jsonwebtoken';
 
 import { env } from '../env';
 
-export const REFRESH_COOKIE_NAME = 'refreshToken';
+export const REFRESH_COOKIE_NAME = 'rt';
 
 export type AccessTokenPayload = JwtPayload & {
   sub: string;
-  [key: string]: unknown;
+  username: string;
+  role: string;
+  tv: number;
 };
 
 export type RefreshTokenPayload = JwtPayload & {
   sub: string;
-  tokenVersion: number;
+  tid: string;
+  fid: string;
+  tv: number;
 };
+
+export const generateTokenId = () => randomUUID();
+
+export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
 type ReplyCookieOptions = Parameters<FastifyReply['setCookie']>[2];
 
 const getRefreshCookieOptions = (): ReplyCookieOptions => {
   const options: ReplyCookieOptions = {
-    httpOnly: env.REFRESH_COOKIE_HTTP_ONLY,
-    sameSite: env.REFRESH_COOKIE_SAME_SITE,
-    secure: env.REFRESH_COOKIE_SECURE || env.NODE_ENV === 'production',
-    path: env.REFRESH_COOKIE_PATH,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.NODE_ENV === 'production',
+    path: '/v1/auth/refresh'
   };
-
-  if (typeof env.REFRESH_TOKEN_EXPIRES_IN === 'number') {
-    options.maxAge = env.REFRESH_TOKEN_EXPIRES_IN;
-  }
 
   if (env.REFRESH_COOKIE_DOMAIN) {
     options.domain = env.REFRESH_COOKIE_DOMAIN;
@@ -41,13 +46,13 @@ const refreshTokenExpiresIn = env.REFRESH_TOKEN_EXPIRES_IN as SignOptions['expir
 
 export function signAccessToken(payload: AccessTokenPayload) {
   return jwt.sign(payload, env.ACCESS_TOKEN_SECRET, {
-    expiresIn: accessTokenExpiresIn,
+    expiresIn: accessTokenExpiresIn
   });
 }
 
 export function signRefreshToken(payload: RefreshTokenPayload) {
   return jwt.sign(payload, env.REFRESH_TOKEN_SECRET, {
-    expiresIn: refreshTokenExpiresIn,
+    expiresIn: refreshTokenExpiresIn
   });
 }
 

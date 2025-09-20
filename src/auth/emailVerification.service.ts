@@ -51,9 +51,10 @@ export class EmailVerificationService {
     }
 
     await prisma.$transaction(async (tx) => {
+      const userId = verification.userId!;
       await VerificationTokenRepository.markUsed(verification.id, now, tx);
       await tx.user.update({
-        where: { id: verification.userId },
+        where: { id: userId },
         data: { isActive: true, emailVerifiedAt: now }
       });
     });

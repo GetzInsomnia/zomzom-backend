@@ -267,15 +267,22 @@ model IdempotencyKey {
 }
 
 model RefreshToken {
-  id         String   @id @default(cuid())
-  userId     String
-  tokenHash  String   @unique
-  expiresAt  DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String         @id @default(cuid())
+  userId         String
+  tokenHash      String         @unique
+  familyId       String
+  rotatedFromId  String?
+  userAgent      String?
+  ipAddress      String?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rotatedFrom    RefreshToken?  @relation("RefreshTokenRotations", fields: [rotatedFromId], references: [id])
+  rotatedChildren RefreshToken[] @relation("RefreshTokenRotations")
 
   @@index([userId])
+  @@index([familyId])
 }
 
 model ViewStat {
