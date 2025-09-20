@@ -1,7 +1,7 @@
 # ENV
 
 ## Present env files
-- ❌ .env
+- ✅ .env
 - ❌ .env.local
 - ✅ .env.example
 - ❌ .env.development
@@ -23,6 +23,7 @@
 | `ADMIN_FALLBACK_USERNAME` | z.string |
 | `ADMIN_FALLBACK_PASSWORD` | z.string |
 | `CORS_ORIGIN` | z.string |
+| `APP_BASE_URL` | z.string |
 | `UPLOAD_DIR` | z.string |
 | `WATERMARK_ENABLED` | z.coerce.boolean |
 | `WATERMARK_TEXT` | z.string |

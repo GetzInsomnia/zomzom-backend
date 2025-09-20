@@ -5,8 +5,8 @@
 ## File type counts (top 20)
 - `.ts`: 49
 - `.md`: 21
-- `.json`: 7
-- `(noext)`: 5
+- `.json`: 8
+- `(noext)`: 6
 - `.sql`: 5
 - `.js`: 2
 - `.example`: 1
@@ -127,14 +127,17 @@
 │  │  ├─ client.ts
 │  │  ├─ seed.light.ts
 │  │  └─ types.ts
+│  ├─ t
 │  ├─ env.ts
 │  ├─ global.d.ts
 │  └─ server.ts
 ├─ .editorconfig
+├─ .env
 ├─ .env.example
 ├─ .gitignore
 ├─ docker-compose.yml
 ├─ Dockerfile
+├─ package-lock.json
 ├─ package.json
 ├─ README.md
 ├─ tsconfig.base.json

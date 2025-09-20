@@ -4,8 +4,9 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "prebuild": "prisma generate",
     "dev": "ts-node-dev --respawn src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "xray": "node scripts/xray-lite.js --out reports/backend",
     "migrate": "prisma migrate deploy",
@@ -13,14 +14,17 @@
     "generate": "prisma generate",
     "migrate:init": "node scripts/generate-initial-migration.js",
     "seed": "ts-node prisma/seed.ts",
-    "seed:light": "ts-node -r dotenv/config prisma/seed.light.ts"
+    "seed:light": "ts-node -r dotenv/config prisma/seed.light.ts",
+    "start:prod": "npm run build && node dist/server.js",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix"
   },
   "dependencies": {
     "@fastify/cookie": "^8.3.0",
     "@fastify/cors": "^8.4.0",
     "@fastify/helmet": "^11.1.1",
     "@fastify/rate-limit": "^8.0.0",
-    "@prisma/client": "^5.15.0",
+    "@prisma/client": "^5.22.0",
     "archiver": "^6.0.2",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
@@ -35,10 +39,13 @@
   "devDependencies": {
     "@types/archiver": "^5.3.4",
     "@types/bcryptjs": "^2.4.6",
+    "@types/formidable": "^3.4.5",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.12.7",
-    "@types/formidable": "^3.4.5",
-    "prisma": "^5.15.0",
+    "@typescript-eslint/eslint-plugin": "^7.8.0",
+    "@typescript-eslint/parser": "^7.8.0",
+    "eslint": "^8.57.0",
+    "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.3"

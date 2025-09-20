@@ -3,8 +3,8 @@
 ## Auth Phase-2 readiness
 
 - ✅ Refresh cookie name set to `rt` — found=rt
-- ✅ Refresh cookie path locked to /v1/auth/refresh — found=/v1/auth/refresh
-- ✅ Refresh cookie SameSite is 'lax' — found=lax
+- ❌ Refresh cookie path locked to /v1/auth/refresh — path option missing
+- ❌ Refresh cookie SameSite is 'lax' — sameSite option missing
 - ✅ Email verification request endpoint
 - ✅ Email verification confirm endpoint
 - ✅ Revoke-all sessions endpoint

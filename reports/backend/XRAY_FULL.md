@@ -40,8 +40,8 @@
 ## Auth Phase-2 readiness
 
 - ✅ Refresh cookie name set to `rt` — found=rt
-- ✅ Refresh cookie path locked to /v1/auth/refresh — found=/v1/auth/refresh
-- ✅ Refresh cookie SameSite is 'lax' — found=lax
+- ❌ Refresh cookie path locked to /v1/auth/refresh — path option missing
+- ❌ Refresh cookie SameSite is 'lax' — sameSite option missing
 - ✅ Email verification request endpoint
 - ✅ Email verification confirm endpoint
 - ✅ Revoke-all sessions endpoint
@@ -104,16 +104,16 @@
 
 # CHECKS (pre-dev)
 
-- ❌ .env file present
-- ❌ DATABASE_URL present
+- ✅ .env file present
+- ✅ DATABASE_URL present
 - ❌ ACCESS_TOKEN_SECRET present
-- ❌ REFRESH_TOKEN_SECRET present
+- ✅ REFRESH_TOKEN_SECRET present (>=32 chars) — length=84
 - ❌ ACCESS_TOKEN_EXPIRES_IN present
 - ❌ REFRESH_TOKEN_EXPIRES_IN present
 - ❌ REFRESH_COOKIE_HTTP_ONLY present
 - ❌ REFRESH_COOKIE_SECURE present
 - ❌ REFRESH_COOKIE_SAME_SITE present
-- ❌ CORS_ORIGIN present
+- ✅ CORS_ORIGIN present
 - ✅ src/server.ts exists
 - import './types/fastify' in server.ts: ❌
 - helmet/cors/rate-limit registered: ✅
@@ -133,7 +133,7 @@
 # ENV
 
 ## Present env files
-- ❌ .env
+- ✅ .env
 - ❌ .env.local
 - ✅ .env.example
 - ❌ .env.development
@@ -155,6 +155,7 @@
 | `ADMIN_FALLBACK_USERNAME` | z.string |
 | `ADMIN_FALLBACK_PASSWORD` | z.string |
 | `CORS_ORIGIN` | z.string |
+| `APP_BASE_URL` | z.string |
 | `UPLOAD_DIR` | z.string |
 | `WATERMARK_ENABLED` | z.coerce.boolean |
 | `WATERMARK_TEXT` | z.string |
@@ -202,8 +203,8 @@
 ## File type counts (top 20)
 - `.ts`: 49
 - `.md`: 21
-- `.json`: 7
-- `(noext)`: 5
+- `.json`: 8
+- `(noext)`: 6
 - `.sql`: 5
 - `.js`: 2
 - `.example`: 1
@@ -324,14 +325,17 @@
 │  │  ├─ client.ts
 │  │  ├─ seed.light.ts
 │  │  └─ types.ts
+│  ├─ t
 │  ├─ env.ts
 │  ├─ global.d.ts
 │  └─ server.ts
 ├─ .editorconfig
+├─ .env
 ├─ .env.example
 ├─ .gitignore
 ├─ docker-compose.yml
 ├─ Dockerfile
+├─ package-lock.json
 ├─ package.json
 ├─ README.md
 ├─ tsconfig.base.json
@@ -645,16 +649,8 @@ station    TransitStation  @relation(fields: [stationId], references: [id], onDe
 
 # ROUTES_AUTH_GUARD
 
-- files scanned: 8
+- files scanned: 0
 - no "import { authenticate } ...authGuard": ✅
-- ⚠ routes that do not use app.authenticate anywhere (manual review):
-  - src/modules/articles/routes.ts
-  - src/modules/backup/routes.ts
-  - src/modules/catalog/routes.ts
-  - src/modules/index/routes.ts
-  - src/modules/properties/routes.ts
-  - src/modules/scheduler/routes.ts
-  - src/modules/suggest/routes.ts
 
 ---
 
@@ -1220,13 +1216,7 @@ export class RefreshTokenService {
 /// <reference path="../global.d.ts" />
 import type { FastifyPluginAsync } from 'fastify';
 import { issueCsrfToken } from '../common/middlewares/csrf';
-import {
-  loginSchema,
-  registerSchema,
-  verificationRequestSchema,
-  verificationConfirmSchema,
-  revokeAllSessionsSchema
-} from './schemas';
+import { loginSchema, registerSchema, verificationConfirmSchema, revokeAllSessionsSchema } from './schemas';
 import { AuthService } from './service';
 import { RefreshTokenService } from './refreshToken.service';
 import { RefreshTokenRepository } from './refreshToken.repository';
@@ -1239,6 +1229,7 @@ import {
   verifyRefresh
 } from './token';
 import { prisma } from '../prisma/client';
+import { env } from '../env';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
@@ -1250,17 +1241,18 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
       const { token, expiresAt } = await EmailVerificationService.issueToken(user.id);
       const verificationPath = `/v1/auth/verify/confirm?token=${token}`;
+      const verificationUrl = `${env.APP_BASE_URL}${verificationPath}`;
       request.log.info(
         {
           userId: user.id,
           email: user.email,
           expiresAt: expiresAt.toISOString(),
-          verificationUrl: verificationPath
+          verificationUrl
         },
         'Verification email issued'
       );
 
-      console.log(`Verification link for ${user.email}: ${verificationPath}`);
+      console.log(`Verification link for ${user.email}: ${verificationUrl}`);
 
       return reply.code(201).send({ ok: true });
     }
@@ -1328,6 +1320,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
     '/v1/auth/verify/request',
     {
+      preHandler: [app.authenticate],
       config: {
         rateLimit: {
           max: 3,
@@ -1337,15 +1330,21 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       }
     },
     async (request, reply) => {
-      const { email } = verificationRequestSchema.parse(request.body);
+      if (!request.user) {
+        return reply.code(401).send({ error: 'UNAUTHORIZED' });
+      }
 
       const user = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, emailVerifiedAt: true }
+        where: { id: request.user.id },
+        select: { id: true, email: true, emailVerifiedAt: true }
       });
 
-      if (!user) {
-        return reply.send({ ok: true, alreadyVerified: false });
+      if (!user || !user.email) {
+        request.log.warn(
+          { userId: request.user.id },
+          'Authenticated user not found when requesting verification email'
+        );
+        return reply.code(401).send({ error: 'UNAUTHORIZED' });
       }
 
       if (user.emailVerifiedAt) {
@@ -1354,19 +1353,16 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
       const { token, expiresAt } = await EmailVerificationService.issueToken(user.id);
       const verificationPath = `/v1/auth/verify/confirm?token=${token}`;
+      const verificationUrl = `${env.APP_BASE_URL}${verificationPath}`;
 
       request.log.info(
         {
           userId: user.id,
-          email,
+          email: user.email,
           expiresAt: expiresAt.toISOString(),
-          verificationUrl: verificationPath
+          verificationUrl
         },
         'Verification email issued'
-      );
-      console.log(`Verification link for ${email}: ${verificationPath}`);
-
-      return reply.send({ ok: true, alreadyVerified: false });
 ...
 ```
 
@@ -1387,10 +1383,6 @@ export const registerSchema = z.object({
     .regex(/^[a-zA-Z0-9_.-]+$/, 'Username may only contain letters, numbers, underscores, hyphens, and dots'),
   email: z.string().email(),
   password: z.string().min(8)
-});
-
-export const verificationRequestSchema = z.object({
-  email: z.string().email()
 });
 
 export const verificationConfirmSchema = z.object({
@@ -1589,10 +1581,10 @@ type ReplyCookieOptions = Parameters<FastifyReply['setCookie']>[2];
 
 const getRefreshCookieOptions = (): ReplyCookieOptions => {
   const options: ReplyCookieOptions = {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
-    path: '/v1/auth/refresh'
+    httpOnly: env.REFRESH_COOKIE_HTTP_ONLY,
+    sameSite: env.REFRESH_COOKIE_SAME_SITE,
+    secure: env.REFRESH_COOKIE_SECURE,
+    path: env.REFRESH_COOKIE_PATH
   };
 
   if (env.REFRESH_COOKIE_DOMAIN) {
