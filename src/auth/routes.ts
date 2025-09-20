@@ -1,21 +1,58 @@
 /// <reference path="../global.d.ts" />
 import type { FastifyPluginAsync } from 'fastify';
-import { clearCsrfCookie, issueCsrfToken } from '../common/middlewares/csrf';
-import { loginSchema, verifyEmailQuerySchema } from './schemas';
+import { issueCsrfToken } from '../common/middlewares/csrf';
+import {
+  loginSchema,
+  registerSchema,
+  verificationRequestSchema,
+  verificationConfirmSchema,
+  revokeAllSessionsSchema
+} from './schemas';
 import { AuthService } from './service';
+import { RefreshTokenService } from './refreshToken.service';
+import { RefreshTokenRepository } from './refreshToken.repository';
+import { EmailVerificationService } from './emailVerification.service';
 import {
   REFRESH_COOKIE_NAME,
   clearRefreshCookie,
   setRefreshCookie,
   signAccessToken,
-  signRefreshToken,
   verifyRefresh
 } from './token';
 import { ensureIdempotencyKey } from '../common/idempotency';
 import { prisma } from '../prisma/client';
-import { EmailVerificationService } from './emailVerification.service';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
+  app.post(
+    '/v1/auth/register',
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'auth.register');
+      if (!(await guard(request, reply))) {
+        return;
+      }
+
+      const body = registerSchema.parse(request.body);
+
+      const user = await AuthService.register(body);
+
+      const { token, expiresAt } = await EmailVerificationService.issueToken(user.id);
+      const verificationPath = `/v1/auth/verify/confirm?token=${token}`;
+      request.log.info(
+        {
+          userId: user.id,
+          email: user.email,
+          expiresAt: expiresAt.toISOString(),
+          verificationUrl: verificationPath
+        },
+        'Verification email issued'
+      );
+
+      console.log(`Verification link for ${user.email}: ${verificationPath}`);
+
+      return reply.code(201).send({ ok: true });
+    }
+  );
+
   app.post(
     '/v1/auth/login',
     {
@@ -33,15 +70,19 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
         return;
       }
       const body = loginSchema.parse(request.body);
-      const user = await AuthService.login(body.username, body.password, request.ip);
+      const userAgent = request.headers['user-agent'] ?? null;
+      const user = await AuthService.login(body.usernameOrEmail, body.password, request.ip);
       const accessToken = signAccessToken({
         sub: user.id,
         role: user.role,
-        username: user.username
+        username: user.username,
+        tv: user.tokenVersion
       });
-      const refreshToken = signRefreshToken({
-        sub: user.id,
-        tokenVersion: user.tokenVersion
+      const { refreshToken } = await RefreshTokenService.issueForLogin({
+        userId: user.id,
+        tokenVersion: user.tokenVersion,
+        userAgent,
+        ipAddress: request.ip
       });
 
       setRefreshCookie(reply, refreshToken);
@@ -65,59 +106,67 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ error: 'UNAUTHORIZED' });
     }
 
-    await prisma.user.update({
-      where: { id: request.user.id },
-      data: { tokenVersion: { increment: 1 } }
-    });
+    const token = request.cookies?.[REFRESH_COOKIE_NAME];
+    if (token) {
+      try {
+        const payload = verifyRefresh(token);
+        await RefreshTokenService.revokeActive({ rawToken: token, payload });
+      } catch (error) {
+        request.log.warn({ err: error }, 'Failed to revoke refresh token on logout');
+      }
+    }
 
     clearRefreshCookie(reply);
     return { ok: true };
   });
 
   app.post(
-    '/v1/auth/send-verify-email',
+    '/v1/auth/verify/request',
     {
-      preHandler: [app.authenticate],
       config: {
         rateLimit: {
           max: 3,
           timeWindow: 60 * 60 * 1000,
-          keyGenerator: (request) => request.headers.authorization ?? request.ip
+          keyGenerator: (request) => request.ip
         }
       }
     },
     async (request, reply) => {
-      if (!request.user) {
-        return reply.code(401).send({ error: 'UNAUTHORIZED' });
-      }
+      const { email } = verificationRequestSchema.parse(request.body);
 
       const user = await prisma.user.findUnique({
-        where: { id: request.user.id },
-        select: { id: true, isActive: true, emailVerifiedAt: true }
+        where: { email },
+        select: { id: true, emailVerifiedAt: true }
       });
 
       if (!user) {
-        return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+        return reply.send({ ok: true, alreadyVerified: false });
       }
 
-      if (user.emailVerifiedAt || user.isActive) {
+      if (user.emailVerifiedAt) {
         return reply.send({ ok: true, alreadyVerified: true });
       }
 
       const { token, expiresAt } = await EmailVerificationService.issueToken(user.id);
+      const verificationPath = `/v1/auth/verify/confirm?token=${token}`;
 
-      // TODO: Integrate email delivery to send `token` to the user's email address.
       request.log.info(
-        { userId: user.id, expiresAt: expiresAt.toISOString() },
-        'Email verification token issued'
+        {
+          userId: user.id,
+          email,
+          expiresAt: expiresAt.toISOString(),
+          verificationUrl: verificationPath
+        },
+        'Verification email issued'
       );
+      console.log(`Verification link for ${email}: ${verificationPath}`);
 
       return reply.send({ ok: true, alreadyVerified: false });
     }
   );
 
-  app.get('/v1/auth/verify-email', async (request, reply) => {
-    const { token } = verifyEmailQuerySchema.parse(request.query);
+  app.post('/v1/auth/verify/confirm', async (request, reply) => {
+    const { token } = verificationConfirmSchema.parse(request.body);
 
     await EmailVerificationService.consumeToken(token);
 
@@ -135,6 +184,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     try {
       payload = verifyRefresh(token);
     } catch (error) {
+      clearRefreshCookie(reply);
       return reply.code(401).send({ error: 'UNAUTHORIZED' });
     }
 
@@ -150,22 +200,67 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (!user || !user.isActive) {
+      clearRefreshCookie(reply);
       return reply.code(403).send({ error: 'FORBIDDEN' });
     }
 
-    if (user.tokenVersion !== payload.tokenVersion) {
+    if (user.tokenVersion !== payload.tv) {
+      clearRefreshCookie(reply);
+      return reply.code(403).send({ error: 'FORBIDDEN' });
+    }
+    let refreshToken: string;
+    try {
+      refreshToken = await RefreshTokenService.rotate({
+        rawToken: token,
+        payload,
+        tokenVersion: user.tokenVersion,
+        userAgent: request.headers['user-agent'] ?? null,
+        ipAddress: request.ip
+      });
+    } catch (error) {
+      request.log.warn({ err: error }, 'Refresh token reuse detected, revoking family');
+      clearRefreshCookie(reply);
       return reply.code(403).send({ error: 'FORBIDDEN' });
     }
 
-    const refreshToken = signRefreshToken({ sub: user.id, tokenVersion: user.tokenVersion });
     const accessToken = signAccessToken({
       sub: user.id,
       role: user.role,
-      username: user.username
+      username: user.username,
+      tv: user.tokenVersion
     });
 
     setRefreshCookie(reply, refreshToken);
 
     return reply.send({ accessToken });
   });
+
+  app.post(
+    '/v1/auth/revoke-all',
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      const guard = ensureIdempotencyKey(app, 'auth.revoke-all');
+      if (!(await guard(request, reply))) {
+        return;
+      }
+
+      if (!request.user) {
+        return reply.code(401).send({ error: 'UNAUTHORIZED' });
+      }
+
+      revokeAllSessionsSchema.parse(request.body ?? {});
+
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: request.user!.id },
+          data: { tokenVersion: { increment: 1 } }
+        });
+        await RefreshTokenRepository.deleteForUser(request.user!.id, tx);
+      });
+
+      clearRefreshCookie(reply);
+
+      return reply.send({ ok: true });
+    }
+  );
 };

@@ -16,7 +16,7 @@ type UserClaims = {
   sub: string;
   username: string;
   role: $Enums.Role; // Prisma enum
-  v?: number;
+  tv: number;
   iat?: number;
   exp?: number;
 };
@@ -50,7 +50,7 @@ const jwtPlugin: FastifyPluginAsync = async (app) => {
       });
 
       if (!user || !user.isActive) throw new Error('User inactive or missing');
-      if (typeof decoded.v === 'number' && user.tokenVersion !== decoded.v) {
+      if (user.tokenVersion !== decoded.tv) {
         throw new Error('Token version mismatch');
       }
 

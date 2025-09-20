@@ -8,7 +8,11 @@ import { createAuditLog } from '../common/utils/audit';
 const BCRYPT_SALT_ROUNDS = 10;
 
 export class AuthService {
-  static async login(username: string, password: string, ipAddress?: string | null) {
+  static async login(
+    usernameOrEmail: string,
+    password: string,
+    ipAddress?: string | null
+  ) {
     const logAttempt = async (
       success: boolean,
       params: { userId?: string | null; reason?: string }
@@ -19,7 +23,7 @@ export class AuthService {
           action: success ? 'auth.login.success' : 'auth.login.failure',
           entityType: 'Auth',
           entityId: params.userId ?? null,
-          meta: { username, reason: params.reason ?? null },
+          meta: { usernameOrEmail, reason: params.reason ?? null },
           ipAddress: ipAddress ?? null
         });
       } catch (error) {
@@ -28,8 +32,10 @@ export class AuthService {
       }
     };
 
-    let user = await prisma.user.findUnique({
-      where: { username }
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [{ username: usernameOrEmail }, { email: usernameOrEmail }]
+      }
     });
 
     if (!user) {
@@ -37,11 +43,14 @@ export class AuthService {
       const hasFallbackCreds = Boolean(env.ADMIN_FALLBACK_USERNAME && env.ADMIN_FALLBACK_PASSWORD);
 
       if (userCount === 0 && hasFallbackCreds) {
-        if (username === env.ADMIN_FALLBACK_USERNAME && password === env.ADMIN_FALLBACK_PASSWORD) {
+        if (
+          usernameOrEmail === env.ADMIN_FALLBACK_USERNAME &&
+          password === env.ADMIN_FALLBACK_PASSWORD
+        ) {
           const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
           user = await prisma.user.create({
             data: {
-              username,
+              username: env.ADMIN_FALLBACK_USERNAME!,
               passwordHash,
               role: 'ADMIN',
               isActive: true,
@@ -76,8 +85,42 @@ export class AuthService {
     return {
       id: authenticatedUser.id,
       username: authenticatedUser.username,
+      email: authenticatedUser.email,
       role: authenticatedUser.role as Role,
       tokenVersion: authenticatedUser.tokenVersion
+    };
+  }
+
+  static async register(params: { username: string; email: string; password: string }) {
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ username: params.username }, { email: params.email }]
+      }
+    });
+
+    if (existingUser) {
+      throw httpError(400, 'Username or email already taken');
+    }
+
+    const passwordHash = await bcrypt.hash(params.password, BCRYPT_SALT_ROUNDS);
+
+    const user = await prisma.user.create({
+      data: {
+        username: params.username,
+        email: params.email,
+        passwordHash,
+        role: 'USER',
+        isActive: false,
+        tokenVersion: 0
+      }
+    });
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role as Role,
+      tokenVersion: user.tokenVersion
     };
   }
 
