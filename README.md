@@ -37,6 +37,7 @@ cp .env.example .env
    - **Diff + deploy (recommended for Plesk/production)** – Use the helper script `npm run migrate:init` to wrap `prisma migrate diff` and capture SQL migrations under `prisma/migrations/`. Commit the generated folder and apply it in shared environments with `npx prisma migrate deploy` so no shadow database credentials are required.
 3. **Seed demo content** – `npm run seed` executes `prisma/seed.ts`, creating the default `admin`/`admin123` account, seeding roughly thirty multilingual showcase properties, and attaching placeholder imagery/metadata. The script is idempotent and safe to rerun after `npx prisma migrate deploy`.
 4. **Start the API server** – `npm run dev` launches Fastify via `ts-node-dev` with auto-reload. For a production-like run, build once with `npm run build` and serve using `npm run start`.
+5. **Run the architecture x-ray (optional)** – `npm run xray` executes `scripts/xray-lite.js` and writes the consolidated report to `reports/backend/`.
 
 With a clean database, run the following in order: `npx prisma migrate deploy`, `npm run seed`, `npm run dev`.
 

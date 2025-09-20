@@ -5,8 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "dev": "ts-node-dev --respawn src/server.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "xray": "node scripts/xray-lite.js --out reports/backend",
     "migrate": "prisma migrate deploy",
     "migrate:deploy": "prisma migrate deploy",
     "generate": "prisma generate",
