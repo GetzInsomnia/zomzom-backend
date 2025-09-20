@@ -15,10 +15,6 @@ export const registerSchema = z.object({
   password: z.string().min(8)
 });
 
-export const verificationRequestSchema = z.object({
-  email: z.string().email()
-});
-
 export const verificationConfirmSchema = z.object({
   token: z
     .string()

@@ -1,13 +1,7 @@
 /// <reference path="../global.d.ts" />
 import type { FastifyPluginAsync } from 'fastify';
 import { issueCsrfToken } from '../common/middlewares/csrf';
-import {
-  loginSchema,
-  registerSchema,
-  verificationRequestSchema,
-  verificationConfirmSchema,
-  revokeAllSessionsSchema
-} from './schemas';
+import { loginSchema, registerSchema, verificationConfirmSchema, revokeAllSessionsSchema } from './schemas';
 import { AuthService } from './service';
 import { RefreshTokenService } from './refreshToken.service';
 import { RefreshTokenRepository } from './refreshToken.repository';
@@ -20,6 +14,7 @@ import {
   verifyRefresh
 } from './token';
 import { prisma } from '../prisma/client';
+import { env } from '../env';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
@@ -31,17 +26,18 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
       const { token, expiresAt } = await EmailVerificationService.issueToken(user.id);
       const verificationPath = `/v1/auth/verify/confirm?token=${token}`;
+      const verificationUrl = `${env.APP_BASE_URL}${verificationPath}`;
       request.log.info(
         {
           userId: user.id,
           email: user.email,
           expiresAt: expiresAt.toISOString(),
-          verificationUrl: verificationPath
+          verificationUrl
         },
         'Verification email issued'
       );
 
-      console.log(`Verification link for ${user.email}: ${verificationPath}`);
+      console.log(`Verification link for ${user.email}: ${verificationUrl}`);
 
       return reply.code(201).send({ ok: true });
     }
@@ -109,6 +105,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
     '/v1/auth/verify/request',
     {
+      preHandler: [app.authenticate],
       config: {
         rateLimit: {
           max: 3,
@@ -118,15 +115,21 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       }
     },
     async (request, reply) => {
-      const { email } = verificationRequestSchema.parse(request.body);
+      if (!request.user) {
+        return reply.code(401).send({ error: 'UNAUTHORIZED' });
+      }
 
       const user = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, emailVerifiedAt: true }
+        where: { id: request.user.id },
+        select: { id: true, email: true, emailVerifiedAt: true }
       });
 
-      if (!user) {
-        return reply.send({ ok: true, alreadyVerified: false });
+      if (!user || !user.email) {
+        request.log.warn(
+          { userId: request.user.id },
+          'Authenticated user not found when requesting verification email'
+        );
+        return reply.code(401).send({ error: 'UNAUTHORIZED' });
       }
 
       if (user.emailVerifiedAt) {
@@ -135,17 +138,18 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
 
       const { token, expiresAt } = await EmailVerificationService.issueToken(user.id);
       const verificationPath = `/v1/auth/verify/confirm?token=${token}`;
+      const verificationUrl = `${env.APP_BASE_URL}${verificationPath}`;
 
       request.log.info(
         {
           userId: user.id,
-          email,
+          email: user.email,
           expiresAt: expiresAt.toISOString(),
-          verificationUrl: verificationPath
+          verificationUrl
         },
         'Verification email issued'
       );
-      console.log(`Verification link for ${email}: ${verificationPath}`);
+      console.log(`Verification link for ${user.email}: ${verificationUrl}`);
 
       return reply.send({ ok: true, alreadyVerified: false });
     }
