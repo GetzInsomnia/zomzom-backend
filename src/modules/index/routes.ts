@@ -6,7 +6,6 @@ import { createAuditLog } from '../../common/utils/audit';
 import { prisma } from '../../prisma/client';
 import { IndexService } from './service';
 import { rebuildRequestSchema, type RebuildBody } from './schemas.autogen';
-import { ensureIdempotencyKey } from '../../common/idempotency';
 
 export async function registerIndexRoutes(app: FastifyInstance) {
   app.post<{ Body: RebuildBody }>(
@@ -20,10 +19,6 @@ export async function registerIndexRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const rebuildRequest = rebuildRequestSchema.parse(request.body);
-      const guard = ensureIdempotencyKey(app, 'index.rebuild');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const summary = await IndexService.rebuild();
       await createAuditLog(prisma, {
         userId: request.user!.id,

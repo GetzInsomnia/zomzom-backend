@@ -3,7 +3,6 @@ import type { $Enums } from '@prisma/client';
 import { roleGuard } from '../../common/middlewares/authGuard';
 import { verifyCsrfToken } from '../../common/middlewares/csrf';
 import { resolvePreviewMode } from '../../common/utils/preview';
-import { ensureIdempotencyKey } from '../../common/idempotency';
 import {
   articleCreateSchema,
   articleIdParamSchema,
@@ -31,10 +30,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.create');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const body = articleCreateSchema.parse(request.body);
       const article = await ArticleService.createArticle(body, request.user!.id, {
         ipAddress: request.ip
@@ -54,10 +49,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.update');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       const body = articleUpdateSchema.parse(request.body);
       const article = await ArticleService.updateArticle(params.id, body, request.user!.id, {
@@ -77,10 +68,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.workflow.draft');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'DRAFT', request.user!.id, {
         ipAddress: request.ip
@@ -99,10 +86,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.workflow.review');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'REVIEW', request.user!.id, {
         ipAddress: request.ip
@@ -121,10 +104,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.workflow.schedule');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       const body = articleScheduleTransitionSchema.parse(request.body);
       const article = await ArticleService.transitionState(params.id, 'SCHEDULED', request.user!.id, {
@@ -145,10 +124,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.workflow.publish');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'PUBLISHED', request.user!.id, {
         ipAddress: request.ip
@@ -167,10 +142,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.workflow.hide');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.transitionState(params.id, 'HIDDEN', request.user!.id, {
         ipAddress: request.ip
@@ -189,10 +160,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.delete');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       await ArticleService.softDelete(params.id, request.user!.id, {
         ipAddress: request.ip
@@ -211,10 +178,6 @@ export async function registerArticleRoutes(app: FastifyInstance) {
       ]
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'articles.restore');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const params = articleIdParamSchema.parse(request.params);
       const article = await ArticleService.restore(params.id, request.user!.id, {
         ipAddress: request.ip

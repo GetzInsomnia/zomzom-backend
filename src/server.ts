@@ -8,6 +8,7 @@ import rateLimit from '@fastify/rate-limit';
 import { env } from './env';
 import { prisma } from './prisma/client';
 import { errorHandler } from './common/middlewares/errorHandler';
+import { registerIdempotencyMiddleware } from './common/idempotency';
 
 // plugins/routes
 import jwtPlugin from './auth/jwt';
@@ -55,6 +56,8 @@ async function bootstrap() {
     },
     credentials: true
   });
+
+  registerIdempotencyMiddleware(app);
 
   // global error handler
   app.setErrorHandler(errorHandler);

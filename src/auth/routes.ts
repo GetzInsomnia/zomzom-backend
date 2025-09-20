@@ -19,18 +19,12 @@ import {
   signAccessToken,
   verifyRefresh
 } from './token';
-import { ensureIdempotencyKey } from '../common/idempotency';
 import { prisma } from '../prisma/client';
 
 export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   app.post(
     '/v1/auth/register',
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'auth.register');
-      if (!(await guard(request, reply))) {
-        return;
-      }
-
       const body = registerSchema.parse(request.body);
 
       const user = await AuthService.register(body);
@@ -65,10 +59,6 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
       }
     },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'auth.login');
-      if (!(await guard(request, reply))) {
-        return;
-      }
       const body = loginSchema.parse(request.body);
       const userAgent = request.headers['user-agent'] ?? null;
       const user = await AuthService.login(body.usernameOrEmail, body.password, request.ip);
@@ -98,10 +88,6 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/v1/auth/logout', { preHandler: [app.authenticate] }, async (request, reply) => {
-    const guard = ensureIdempotencyKey(app, 'auth.logout');
-    if (!(await guard(request, reply))) {
-      return;
-    }
     if (!request.user) {
       return reply.code(401).send({ error: 'UNAUTHORIZED' });
     }
@@ -239,11 +225,6 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     '/v1/auth/revoke-all',
     { preHandler: [app.authenticate] },
     async (request, reply) => {
-      const guard = ensureIdempotencyKey(app, 'auth.revoke-all');
-      if (!(await guard(request, reply))) {
-        return;
-      }
-
       if (!request.user) {
         return reply.code(401).send({ error: 'UNAUTHORIZED' });
       }
