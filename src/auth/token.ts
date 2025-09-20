@@ -28,10 +28,10 @@ type ReplyCookieOptions = Parameters<FastifyReply['setCookie']>[2];
 
 const getRefreshCookieOptions = (): ReplyCookieOptions => {
   const options: ReplyCookieOptions = {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
-    path: '/v1/auth/refresh'
+    httpOnly: env.REFRESH_COOKIE_HTTP_ONLY,
+    sameSite: env.REFRESH_COOKIE_SAME_SITE,
+    secure: env.REFRESH_COOKIE_SECURE,
+    path: env.REFRESH_COOKIE_PATH
   };
 
   if (env.REFRESH_COOKIE_DOMAIN) {
