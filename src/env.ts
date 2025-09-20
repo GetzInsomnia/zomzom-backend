@@ -31,7 +31,7 @@ const envSchema = z.object({
   REFRESH_COOKIE_HTTP_ONLY: z.coerce.boolean().default(true),
   REFRESH_COOKIE_SECURE: z.coerce.boolean().default(false),
   REFRESH_COOKIE_SAME_SITE: sameSiteSchema,
-  REFRESH_COOKIE_PATH: z.string().default('/'),
+  REFRESH_COOKIE_PATH: z.string().default('/v1/auth/refresh'),
   REFRESH_COOKIE_DOMAIN: z.string().optional(),
   ADMIN_FALLBACK_USERNAME: z.string().optional(),
   ADMIN_FALLBACK_PASSWORD: z.string().optional(),
