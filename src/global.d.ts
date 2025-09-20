@@ -10,6 +10,7 @@ declare module 'fastify' {
       role: $Enums.Role; // Prisma enum
     };
     previewMode?: boolean;
+    idempotencyKeyRecordId?: string;
   }
 
   interface FastifyInstance {

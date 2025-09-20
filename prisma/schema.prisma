@@ -250,20 +250,24 @@ model Favorite {
 }
 
 model IdempotencyKey {
-  id        String   @id @default(cuid())
-  key       String
-  userId    String   @default("__global__")
-  route     String
-  createdAt DateTime @default(now())
-  bodyHash      String?
-  status        Int?
-  responseJson  Json?
-  responseHash  String?
-  expiresAt     DateTime?
+  id              String   @id @default(cuid())
+  key             String
+  method          String
+  path            String
+  requestBody     Json?
+  requestBodyHash String?
+  status          Int?
+  responseJson    Json?
+  responseHash    String?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  userId          String?
+  ipAddress       String?
+  userAgent       String?
 
   @@map("IdemKey")
-  @@unique([route, key, userId])
-  @@index([route, userId])
+  @@unique([key, method, path])
+  @@index([expiresAt])
 }
 
 model RefreshToken {
