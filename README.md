@@ -31,7 +31,7 @@ cp .env.example .env
 
 ### Developer runbook
 
-1. **Boot MySQL** – run `docker compose up -d db` (or point `DATABASE_URL` to your own MySQL 8 instance). When developing migrations locally, also create an empty shadow database and expose it through `SHADOW_DATABASE_URL`.
+1. **Boot MySQL** – run `docker compose up -d db` (or point `DATABASE_URL` to your own MySQL 8 instance). The compose file loads shared values from `.env` and defaults to `zomzom`/`zomzompass` (user) with `root`/`rootpass` for the root account so the example `DATABASE_URL` works out of the box. When developing migrations locally, also create an empty shadow database and expose it through `SHADOW_DATABASE_URL`.
 2. **Manage migrations** – Choose the workflow that matches your environment:
    - **Local iteration (`prisma migrate dev`)** – When prototyping locally, run `npx prisma migrate dev --name <change>` with both `DATABASE_URL` and an empty `SHADOW_DATABASE_URL`. This flow regenerates your dev database and shadow schema so you can iterate quickly.
    - **Diff + deploy (recommended for Plesk/production)** – Use the helper script `npm run migrate:init` to wrap `prisma migrate diff` and capture SQL migrations under `prisma/migrations/`. Commit the generated folder and apply it in shared environments with `npx prisma migrate deploy` so no shadow database credentials are required.
