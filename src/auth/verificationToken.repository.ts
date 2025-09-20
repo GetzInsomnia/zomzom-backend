@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, EmailVerification } from '@prisma/client';
+import type { Prisma, PrismaClient, VerificationToken } from '@prisma/client';
 import { prisma } from '../prisma/client';
 
 type PrismaClientOrTx = PrismaClient | Prisma.TransactionClient;
@@ -7,34 +7,35 @@ type CreateVerificationParams = {
   userId: string;
   tokenHash: string;
   expiresAt: Date;
+  email?: string | null;
 };
 
 const getClient = (client?: PrismaClientOrTx) => client ?? prisma;
 
-export class EmailVerificationRepository {
+export class VerificationTokenRepository {
   static async create(
     data: CreateVerificationParams,
     client?: PrismaClientOrTx
-  ): Promise<EmailVerification> {
+  ): Promise<VerificationToken> {
     const db = getClient(client);
-    return db.emailVerification.create({ data });
+    return db.verificationToken.create({ data });
   }
 
   static async findByTokenHash(
     tokenHash: string,
     client?: PrismaClientOrTx
-  ): Promise<EmailVerification | null> {
+  ): Promise<VerificationToken | null> {
     const db = getClient(client);
-    return db.emailVerification.findUnique({ where: { tokenHash } });
+    return db.verificationToken.findUnique({ where: { tokenHash } });
   }
 
   static async markUsed(
     id: string,
     usedAt: Date,
     client?: PrismaClientOrTx
-  ): Promise<EmailVerification> {
+  ): Promise<VerificationToken> {
     const db = getClient(client);
-    return db.emailVerification.update({ where: { id }, data: { usedAt } });
+    return db.verificationToken.update({ where: { id }, data: { usedAt } });
   }
 
   static async deleteExpiredForUser(
@@ -43,7 +44,7 @@ export class EmailVerificationRepository {
     client?: PrismaClientOrTx
   ): Promise<number> {
     const db = getClient(client);
-    const result = await db.emailVerification.deleteMany({
+    const result = await db.verificationToken.deleteMany({
       where: {
         userId,
         OR: [

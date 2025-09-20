@@ -57,6 +57,7 @@ enum PropertyStatus {
 model User {
   id           String    @id @default(cuid())
   username     String    @unique
+  email        String?   @unique
   passwordHash String
   role         Role      @default(ADMIN)
   localePref   String?   // admin UI locale
@@ -64,22 +65,26 @@ model User {
   tokenVersion Int       @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  emailVerifiedAt DateTime?
   auditLogs    AuditLog[]
   changeSets   ChangeSet[] @relation("ChangeSetCreatedBy")
   favorites    Favorite[]
-  emailVerifications EmailVerification[]
+  verificationTokens VerificationToken[]
+  refreshTokens      RefreshToken[]
 }
 
-model EmailVerification {
+model VerificationToken {
   id         String   @id @default(cuid())
-  userId     String
+  userId     String?
+  email      String?
   tokenHash  String
   expiresAt  DateTime
   usedAt     DateTime?
   createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([email])
   @@unique([tokenHash])
 }
 
@@ -244,15 +249,33 @@ model Favorite {
   @@unique([userId, propertyId])
 }
 
-model IdemKey {
+model IdempotencyKey {
   id        String   @id @default(cuid())
   key       String
   userId    String   @default("__global__")
   route     String
   createdAt DateTime @default(now())
+  bodyHash      String?
+  status        Int?
+  responseJson  Json?
+  responseHash  String?
+  expiresAt     DateTime?
 
+  @@map("IdemKey")
   @@unique([route, key, userId])
   @@index([route, userId])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model ViewStat {
