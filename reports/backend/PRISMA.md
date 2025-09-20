@@ -13,15 +13,32 @@
 ```
 id           String    @id @default(cuid())
 username     String    @unique
+email        String?   @unique
 passwordHash String
 role         Role      @default(ADMIN)
 localePref   String?   // admin UI locale
 isActive     Boolean   @default(true)
+tokenVersion Int       @default(0)
 createdAt    DateTime  @default(now())
 updatedAt    DateTime  @updatedAt
+emailVerifiedAt DateTime?
 auditLogs    AuditLog[]
 changeSets   ChangeSet[] @relation("ChangeSetCreatedBy")
 favorites    Favorite[]
+verificationTokens VerificationToken[]
+refreshTokens      RefreshToken[]
+```
+
+### VerificationToken
+```
+id         String   @id @default(cuid())
+userId     String?
+email      String?
+tokenHash  String
+expiresAt  DateTime
+usedAt     DateTime?
+createdAt  DateTime @default(now())
+user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 ```
 
 ### Property
@@ -177,6 +194,41 @@ propertyId String
 createdAt  DateTime @default(now())
 user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+```
+
+### IdempotencyKey
+```
+id              String   @id @default(cuid())
+key             String
+method          String
+path            String
+requestBody     Json?
+requestBodyHash String?
+status          Int?
+responseJson    Json?
+responseHash    String?
+expiresAt       DateTime?
+createdAt       DateTime @default(now())
+userId          String?
+ipAddress       String?
+userAgent       String?
+```
+
+### RefreshToken
+```
+id             String         @id @default(cuid())
+userId         String
+tokenHash      String         @unique
+familyId       String
+rotatedFromId  String?
+userAgent      String?
+ipAddress      String?
+expiresAt      DateTime?
+revokedAt      DateTime?
+createdAt      DateTime       @default(now())
+user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+rotatedFrom    RefreshToken?  @relation("RefreshTokenRotations", fields: [rotatedFromId], references: [id])
+rotatedChildren RefreshToken[] @relation("RefreshTokenRotations")
 ```
 
 ### ViewStat
