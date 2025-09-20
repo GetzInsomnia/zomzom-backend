@@ -1,9 +1,9 @@
 # ENV
 
 ## Present env files
-- ✅ .env
+- ❌ .env
 - ❌ .env.local
-- ❌ .env.example
+- ✅ .env.example
 - ❌ .env.development
 - ❌ .env.production
 
@@ -16,7 +16,10 @@
 | `PORT` | z.coerce.number |
 | `DATABASE_URL` | z.string |
 | `SHADOW_DATABASE_URL` | z.string |
-| `JWT_SECRET` | z.string |
+| `REFRESH_COOKIE_HTTP_ONLY` | z.coerce.boolean |
+| `REFRESH_COOKIE_SECURE` | z.coerce.boolean |
+| `REFRESH_COOKIE_PATH` | z.string |
+| `REFRESH_COOKIE_DOMAIN` | z.string |
 | `ADMIN_FALLBACK_USERNAME` | z.string |
 | `ADMIN_FALLBACK_PASSWORD` | z.string |
 | `CORS_ORIGIN` | z.string |

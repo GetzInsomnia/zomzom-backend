@@ -4,9 +4,14 @@
 
 | Method | Path/Url | File |
 |---|---|---|
+| POST | `/v1/auth/register` | `src/auth/routes.ts` |
 | POST | `/v1/auth/login` | `src/auth/routes.ts` |
 | GET | `/v1/auth/me` | `src/auth/routes.ts` |
 | POST | `/v1/auth/logout` | `src/auth/routes.ts` |
+| POST | `/v1/auth/verify/request` | `src/auth/routes.ts` |
+| POST | `/v1/auth/verify/confirm` | `src/auth/routes.ts` |
+| POST | `/v1/auth/refresh` | `src/auth/routes.ts` |
+| POST | `/v1/auth/revoke-all` | `src/auth/routes.ts` |
 | GET | `/v1/articles/:slug` | `src/modules/articles/routes.ts` |
 | POST | `/v1/articles` | `src/modules/articles/routes.ts` |
 | PATCH | `/v1/articles/:id` | `src/modules/articles/routes.ts` |
@@ -20,7 +25,6 @@
 | GET | `/api/admin/backup` | `src/modules/backup/routes.ts` |
 | GET | `/api/catalog/filters` | `src/modules/catalog/routes.ts` |
 | GET | `/api/catalog/transit` | `src/modules/catalog/routes.ts` |
-| POST | `/v1/index/rebuild` | `src/modules/index/routes.ts` |
 | GET | `/v1/properties` | `src/modules/properties/routes.ts` |
 | GET | `/v1/properties/:id` | `src/modules/properties/routes.ts` |
 | POST | `/v1/properties` | `src/modules/properties/routes.ts` |
@@ -38,3 +42,4 @@
 | GET | `/v1/schedule/jobs` | `src/modules/scheduler/routes.ts` |
 | GET | `/api/suggest` | `src/modules/suggest/routes.ts` |
 | GET | `/health` | `src/server.ts` |
+| GET | `/ready` | `src/server.ts` |

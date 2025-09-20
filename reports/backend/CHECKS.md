@@ -1,9 +1,15 @@
 # CHECKS (pre-dev)
 
-- ✅ .env file present
-- ✅ DATABASE_URL present
-- ✅ JWT_SECRET present (>=32 chars) — length=64
-- ✅ CORS_ORIGIN present
+- ❌ .env file present
+- ❌ DATABASE_URL present
+- ❌ ACCESS_TOKEN_SECRET present
+- ❌ REFRESH_TOKEN_SECRET present
+- ❌ ACCESS_TOKEN_EXPIRES_IN present
+- ❌ REFRESH_TOKEN_EXPIRES_IN present
+- ❌ REFRESH_COOKIE_HTTP_ONLY present
+- ❌ REFRESH_COOKIE_SECURE present
+- ❌ REFRESH_COOKIE_SAME_SITE present
+- ❌ CORS_ORIGIN present
 - ✅ src/server.ts exists
 - import './types/fastify' in server.ts: ❌
 - helmet/cors/rate-limit registered: ✅

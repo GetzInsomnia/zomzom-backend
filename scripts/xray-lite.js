@@ -19,6 +19,8 @@ const SKIP_DIRS = new Set([
   '.vscode','.idea','.cache','.terraform'
 ]);
 
+const SNIPPET_MAX_LINES = 150;
+
 ensureDir(OUTDIR);
 function ensureDir(p){ if(!fs.existsSync(p)) fs.mkdirSync(p,{recursive:true}); }
 function exists(p){ return fs.existsSync(p); }
@@ -70,6 +72,9 @@ function posBefore(s, a, b){
   const ia = s.indexOf(a), ib = s.indexOf(b);
   if(ia === -1 || ib === -1) return null;
   return ia < ib;
+}
+function slugify(name){
+  return name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 }
 
 // ---------- INVENTORY ----------
@@ -526,6 +531,109 @@ function extractZodEnvKeys(src){
 })();
 
 
+// ---------- ADVANCED_CHECKS ----------
+(function(){
+  const lines = ['# ADVANCED_CHECKS', '', '## Auth Phase-2 readiness', ''];
+
+  const tokenPath = path.join(ROOT,'src','auth','token.ts');
+  const tokenSrc = exists(tokenPath) ? read(tokenPath, 256*1024) : '';
+  const cookieName = tokenSrc && tokenSrc.match(/REFRESH_COOKIE_NAME\s*=\s*['"]([^'"]+)['"]/);
+  addCheck(
+    lines,
+    'Refresh cookie name set to `rt`',
+    !!cookieName && cookieName[1] === 'rt',
+    cookieName ? `found=${cookieName[1]}` : 'token.ts missing or pattern not found'
+  );
+  const cookiePath = tokenSrc && tokenSrc.match(/path:\s*['"]([^'"]+)['"]/);
+  addCheck(
+    lines,
+    'Refresh cookie path locked to /v1/auth/refresh',
+    !!cookiePath && cookiePath[1] === '/v1/auth/refresh',
+    cookiePath ? `found=${cookiePath[1]}` : 'path option missing'
+  );
+  const sameSite = tokenSrc && tokenSrc.match(/sameSite:\s*['"]([^'"]+)['"]/i);
+  addCheck(
+    lines,
+    "Refresh cookie SameSite is 'lax'",
+    !!sameSite && sameSite[1].toLowerCase() === 'lax',
+    sameSite ? `found=${sameSite[1]}` : 'sameSite option missing'
+  );
+
+  const authRoutesPath = path.join(ROOT,'src','auth','routes.ts');
+  const authRoutesSrc = exists(authRoutesPath) ? read(authRoutesPath, 512*1024) : '';
+  const endpointChecks = [
+    ['/v1/auth/verify/request', 'Email verification request endpoint'],
+    ['/v1/auth/verify/confirm', 'Email verification confirm endpoint'],
+    ['/v1/auth/revoke-all', 'Revoke-all sessions endpoint'],
+    ['/v1/auth/refresh', 'Refresh endpoint with rotation'],
+    ['/v1/auth/logout', 'Logout endpoint clears refresh cookie']
+  ];
+  for(const [needle,label] of endpointChecks){
+    const rx = new RegExp(`['\"]${needle}['\"]`);
+    addCheck(lines, `${label}`, rx.test(authRoutesSrc||''), authRoutesSrc? '': 'routes.ts missing');
+  }
+
+  const refreshServicePath = path.join(ROOT,'src','auth','refreshToken.service.ts');
+  const refreshServiceSrc = exists(refreshServicePath) ? read(refreshServicePath, 512*1024) : '';
+  const tvInAccessType = /AccessTokenPayload[\s\S]+tv:\s*number/.test(tokenSrc||'');
+  const tvInRefreshType = /RefreshTokenPayload[\s\S]+tv:\s*number/.test(tokenSrc||'');
+  const tvInAccessSign = /signAccessToken\s*\([\s\S]*tv:/.test(authRoutesSrc||'');
+  const tvInRefreshSign = /signRefreshToken\s*\([\s\S]*tv:/.test(refreshServiceSrc||'');
+  addCheck(lines, 'JWT payloads include token version (`tv`) claim', tvInAccessType && tvInRefreshType && tvInAccessSign && tvInRefreshSign);
+
+  const idempotencyPath = path.join(ROOT,'src','common','idempotency.ts');
+  const idempotencySrc = exists(idempotencyPath) ? read(idempotencyPath, 512*1024) : '';
+  const hasPatchedSend = /reply\.send\s*=\s*function patchedSend/.test(idempotencySrc||'');
+  const hasResponseHash = /responseHash/.test(idempotencySrc||'');
+  const hasCleanupHook = /cleanupExpiredKeys/.test(idempotencySrc||'') && /setInterval/.test(idempotencySrc||'');
+  addCheck(
+    lines,
+    'Idempotency middleware stores and replays responses',
+    hasPatchedSend && hasResponseHash,
+    idempotencySrc? '' : 'idempotency.ts missing'
+  );
+  addCheck(
+    lines,
+    'Idempotency middleware schedules cleanup for expired keys',
+    hasCleanupHook,
+    idempotencySrc? '' : 'idempotency.ts missing'
+  );
+
+  const schedulerPath = path.join(ROOT,'src','modules','scheduler','service.ts');
+  const schedulerSrc = exists(schedulerPath) ? read(schedulerPath, 512*1024) : '';
+  const hasReleaseFn = /releaseExpiredReservations/.test(schedulerSrc||'');
+  const logsRelease = /Released expired property reservations/.test(schedulerSrc||'');
+  addCheck(
+    lines,
+    'Scheduler can release expired reservations',
+    hasReleaseFn && logsRelease,
+    schedulerSrc? '' : 'scheduler/service.ts missing'
+  );
+
+  const prismaSchemaSrc = exists(prismaSchemaPath) ? read(prismaSchemaPath, 1024*1024) : '';
+  const hasIdempotencyModel = /model\s+IdempotencyKey\s*\{/.test(prismaSchemaSrc||'');
+  const hasRefreshModel = /model\s+RefreshToken\s*\{/.test(prismaSchemaSrc||'');
+  addCheck(lines, 'Prisma model for IdempotencyKey present', hasIdempotencyModel, prismaSchemaSrc? '' : 'schema.prisma missing');
+  addCheck(lines, 'Prisma model for RefreshToken present', hasRefreshModel, prismaSchemaSrc? '' : 'schema.prisma missing');
+
+  const dockerPath = path.join(ROOT,'docker-compose.yml');
+  const dockerSrc = exists(dockerPath) ? read(dockerPath, 256*1024) : '';
+  const hasApiService = /\n\s*api:\s*\n/.test(dockerSrc||'');
+  const hasDbService = /\n\s*db:\s*\n/.test(dockerSrc||'');
+  addCheck(lines, 'docker-compose defines `api` service', hasApiService, dockerSrc? '' : 'docker-compose.yml missing');
+  addCheck(lines, 'docker-compose defines `db` service', hasDbService, dockerSrc? '' : 'docker-compose.yml missing');
+
+  const postmanDir = path.join(ROOT,'postman');
+  const postmanCollection = path.join(postmanDir,'Realestate-API.postman_collection.json');
+  const postmanEnv = path.join(postmanDir,'local.postman_environment.json');
+  addCheck(lines, 'Postman collection present', exists(postmanCollection), rel(postmanCollection));
+  addCheck(lines, 'Postman local environment present', exists(postmanEnv), rel(postmanEnv));
+
+  lines.push('');
+  write('ADVANCED_CHECKS.md', lines.join('\n'));
+})();
+
+
 // ---------- BUILD.json ----------
 (function(){
   const obj = {
@@ -589,5 +697,99 @@ function extractZodEnvKeys(src){
   lines.push(`- jwt.ts has triple-slash reference to ../global.d.ts (optional): ${hasTriple ? '✅' : '–'}`);
 
   write('FASTIFY_AUGMENTATION.md', lines.join('\n'));
+})();
+
+
+// ---------- SNIPPETS ----------
+(function(){
+  const lines=['# SNIPPETS','', `Showing first ~${SNIPPET_MAX_LINES} lines per file.`, ''];
+  const snippets=[];
+
+  const pushSnippet = (fullPath)=>{
+    snippets.push(fullPath);
+  };
+
+  if(exists(serverTsPath)) pushSnippet(serverTsPath);
+  else lines.push('- ❌ src/server.ts not found');
+
+  const modulesAuthDir = path.join(ROOT,'src','modules','auth');
+  if(exists(modulesAuthDir)){
+    const files = walk(modulesAuthDir).filter(f=>/\.ts$/.test(f)).sort((a,b)=>rel(a).localeCompare(rel(b)));
+    files.forEach(pushSnippet);
+  } else {
+    lines.push('- ⚠️ Directory missing: src/modules/auth');
+  }
+
+  const altAuthDir = path.join(ROOT,'src','auth');
+  if(exists(altAuthDir)){
+    const files = walk(altAuthDir).filter(f=>/\.ts$/.test(f)).sort((a,b)=>rel(a).localeCompare(rel(b)));
+    if(files.length){
+      lines.push('');
+      lines.push('_Including src/auth directory for coverage._');
+      lines.push('');
+      files.forEach(pushSnippet);
+    }
+  }
+
+  const idempotencyPath = path.join(ROOT,'src','common','idempotency.ts');
+  if(exists(idempotencyPath)) pushSnippet(idempotencyPath);
+  else lines.push('- ❌ src/common/idempotency.ts not found');
+
+  if(exists(prismaSchemaPath)) pushSnippet(prismaSchemaPath);
+  else lines.push('- ❌ prisma/schema.prisma not found');
+
+  const dockerComposePath = path.join(ROOT,'docker-compose.yml');
+  if(exists(dockerComposePath)) pushSnippet(dockerComposePath);
+  else lines.push('- ❌ docker-compose.yml not found');
+
+  const seen = new Set();
+  for(const fullPath of snippets){
+    if(!fullPath || seen.has(fullPath)) continue;
+    seen.add(fullPath);
+    const relative = rel(fullPath);
+    lines.push(`## ${relative}`);
+    const raw = read(fullPath, 2*1024*1024);
+    if(typeof raw !== 'string'){
+      lines.push('_Unable to read file (may be binary or missing)._');
+      lines.push('');
+      continue;
+    }
+    const rows = raw.split(/\r?\n/);
+    const slice = rows.slice(0, SNIPPET_MAX_LINES);
+    if(rows.length>SNIPPET_MAX_LINES) slice.push('...');
+    const ext = path.extname(fullPath).slice(1);
+    const lang = ext || 'text';
+    lines.push('```'+lang);
+    lines.push(slice.join('\n'));
+    lines.push('```');
+    lines.push('');
+  }
+
+  write('SNIPPETS.md', lines.join('\n'));
+})();
+
+
+// ---------- XRAY_FULL ----------
+(function(){
+  const mdFiles = fs.readdirSync(OUTDIR)
+    .filter(name => name.endsWith('.md') && name !== 'XRAY_FULL.md')
+    .sort((a,b)=>a.localeCompare(b));
+  const lines=['# XRAY FULL REPORT','', '## Table of Contents',''];
+  mdFiles.forEach(name=>{
+    lines.push(`- [${name}](#${slugify(name)})`);
+  });
+  lines.push('');
+
+  mdFiles.forEach(name=>{
+    const content = read(path.join(OUTDIR,name), 5*1024*1024) || '';
+    lines.push(`## ${name}`);
+    lines.push('');
+    lines.push(content.trim());
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  });
+
+  write('XRAY_FULL.md', lines.join('\n').replace(/\n{3,}/g,'\n\n'));
 })();
 
