@@ -13,6 +13,13 @@ Secure API layer for the Zomzom Property platform built with Fastify, Prisma, an
 - **Suggestion endpoint** for quick “starts with” lookups from property titles, article titles, and locations.
 - **Prisma ORM** with MySQL schema, migrations, and a `prisma/seed.ts` fixture that provisions an `admin`/`admin123` superuser, roughly thirty multilingual showcase properties, and placeholder Unsplash imagery.
 
+## Backend status
+
+- **Auth Phase-2 flows** – Registration, email verification, refresh rotation, and session revocation are live with rate-limited endpoints and cookie helpers hardened for production refresh workflows (`src/auth/routes.ts`, `src/auth/token.ts`, `src/auth/refreshToken.service.ts`, `src/auth/emailVerification.service.ts`).
+- **Idempotency replay** – `registerIdempotencyMiddleware` captures request/response payloads, hashes responses, and supports replaying safe retries on any route that opts-in, backed by the `IdempotencyKey` model (`src/common/idempotency.ts`, `src/server.ts`, `prisma/schema.prisma`, `prisma/migrations/004_update_idem_key_table/migration.sql`).
+- **Schema updates** – Prisma schema reflects the refreshed auth stack (verification + refresh tokens) alongside the idempotency ledger and scheduler relationships to guarantee referential integrity (`prisma/schema.prisma`).
+- **Tooling & endpoints** – Health/readiness endpoints and scheduler/index modules are registered by default, with diagnostics captured by the lightweight architecture x-ray reporter (`src/server.ts`, `scripts/xray-lite.js`, `reports/backend/XRAY_FULL.md`).
+
 ## Getting started
 
 ### Requirements
@@ -26,20 +33,28 @@ Secure API layer for the Zomzom Property platform built with Fastify, Prisma, an
 ```bash
 npm install
 cp .env.example .env
-# Update .env with real credentials and secrets
+# Update .env with real credentials and secrets (see table below)
 ```
+
+### Quick start
+
+1. **Configure environment** – Duplicate `.env.example`, review cookie/security flags (`REFRESH_COOKIE_*`) and database credentials, then keep the file local to your machine. Compose services also read this file by default.
+2. **Launch infrastructure** – Start the API and MySQL services together with Docker Compose: `docker compose up -d` (brings up both `api` and `db`; the API container waits on the DB health check before booting Fastify).
+3. **Run migrations** – Whether you are running the API in Docker or locally, apply the checked-in migrations with `npx prisma migrate deploy` so Prisma client models stay in sync.
+4. **Seed demo content** – `npm run seed` executes `prisma/seed.ts`, creating the default `admin`/`admin123` account, seeding roughly thirty multilingual showcase properties, and attaching placeholder imagery/metadata. The script is idempotent and safe to rerun after `npx prisma migrate deploy`.
+5. **Start the API server** – `npm run dev` launches Fastify via `ts-node-dev` with auto-reload. For a production-like run, build once with `npm run build` and serve using `npm run start`.
+6. **Exercise endpoints** – Import `postman/Realestate-API.postman_collection.json` into Postman (paired with `postman/local.postman_environment.json`) or run it headlessly via `npx newman run postman/Realestate-API.postman_collection.json -e postman/local.postman_environment.json` to validate happy-path flows against your environment.
+7. **Run the architecture x-ray (optional)** – `npm run xray` executes `scripts/xray-lite.js` and writes the consolidated report to `reports/backend/`.
+
+With a clean database, run the following in order: `docker compose up -d`, `npx prisma migrate deploy`, `npm run seed`, `npm run dev`.
 
 ### Developer runbook
 
-1. **Boot MySQL** – run `docker compose up -d db` (or point `DATABASE_URL` to your own MySQL 8 instance). The compose file loads shared values from `.env` and defaults to `zomzom`/`zomzompass` (user) with `root`/`rootpass` for the root account so the example `DATABASE_URL` works out of the box. When developing migrations locally, also create an empty shadow database and expose it through `SHADOW_DATABASE_URL`.
+1. **Boot MySQL only (optional)** – If you prefer to run the API locally rather than in Docker, use `docker compose up -d db` (or point `DATABASE_URL` to your own MySQL 8 instance). The compose file loads shared values from `.env` and defaults to `zomzom`/`zomzompass` (user) with `root`/`rootpass` for the root account so the example `DATABASE_URL` works out of the box. When developing migrations locally, also create an empty shadow database and expose it through `SHADOW_DATABASE_URL`.
 2. **Manage migrations** – Choose the workflow that matches your environment:
    - **Local iteration (`prisma migrate dev`)** – When prototyping locally, run `npx prisma migrate dev --name <change>` with both `DATABASE_URL` and an empty `SHADOW_DATABASE_URL`. This flow regenerates your dev database and shadow schema so you can iterate quickly.
    - **Diff + deploy (recommended for Plesk/production)** – Use the helper script `npm run migrate:init` to wrap `prisma migrate diff` and capture SQL migrations under `prisma/migrations/`. Commit the generated folder and apply it in shared environments with `npx prisma migrate deploy` so no shadow database credentials are required.
-3. **Seed demo content** – `npm run seed` executes `prisma/seed.ts`, creating the default `admin`/`admin123` account, seeding roughly thirty multilingual showcase properties, and attaching placeholder imagery/metadata. The script is idempotent and safe to rerun after `npx prisma migrate deploy`.
-4. **Start the API server** – `npm run dev` launches Fastify via `ts-node-dev` with auto-reload. For a production-like run, build once with `npm run build` and serve using `npm run start`.
-5. **Run the architecture x-ray (optional)** – `npm run xray` executes `scripts/xray-lite.js` and writes the consolidated report to `reports/backend/`.
-
-With a clean database, run the following in order: `npx prisma migrate deploy`, `npm run seed`, `npm run dev`.
+3. **Smoke tests** – Continue to use the bundled Postman collection or Newman command above after each feature branch or migration to ensure RBAC flows and idempotent POSTs behave as expected.
 
 ### Migration workflows
 
@@ -57,7 +72,7 @@ With a clean database, run the following in order: `npx prisma migrate deploy`, 
 | `ACCESS_TOKEN_EXPIRES_IN` | Access token lifetime (seconds or time expression like `15m`) |
 | `REFRESH_TOKEN_EXPIRES_IN` | Refresh token lifetime (seconds or time expression like `7d`) |
 | `REFRESH_COOKIE_HTTP_ONLY` | `true`/`false` flag controlling the refresh cookie `HttpOnly` attribute |
-| `REFRESH_COOKIE_SECURE` | `true`/`false` flag forcing the refresh cookie `Secure` attribute (defaults to `true` in production) |
+| `REFRESH_COOKIE_SECURE` | `true`/`false` flag forcing the refresh cookie `Secure` attribute (defaults to `true` in production; set `false` only for local development over HTTP) |
 | `REFRESH_COOKIE_SAME_SITE` | SameSite mode for the refresh cookie (`lax`/`strict`/`none`) |
 | `REFRESH_COOKIE_PATH` | Path scope for the refresh cookie (`/`) |
 | `REFRESH_COOKIE_DOMAIN` | Optional domain for the refresh cookie |
@@ -72,6 +87,13 @@ With a clean database, run the following in order: `npx prisma migrate deploy`, 
 | `RATE_LIMIT_MAX` | Requests per window (default `100`) |
 | `RATE_LIMIT_WINDOW` | Rate limit window in seconds (default `900`, i.e. 15 minutes) |
 | `INDEX_DIR` | Directory for MiniSearch index JSON files (`./public/data/index`) |
+
+Refer to `.env.example` for sample values that align with Docker Compose defaults and the refresh cookie guidance above.
+
+## Tooling & diagnostics
+
+- **Architecture x-ray** – Run `npm run xray` or invoke `node scripts/xray-lite.js --out reports/backend` directly to regenerate dependency maps and readiness notes. The full report is written to `reports/backend/XRAY_FULL.md`; supplemental extracts live alongside it in the `reports/backend` folder.
+- **Health surfaces** – `GET /health` (liveness) and `GET /ready` (DB-backed readiness) are available once the server boots, making it easy to wire into container orchestrators or uptime checks.
 
 ## API overview (v6)
 
