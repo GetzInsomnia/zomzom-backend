@@ -210,7 +210,7 @@ export const registerAuthRoutes: FastifyPluginAsync = async (app) => {
     } catch (error) {
       request.log.warn({ err: error }, 'Refresh token reuse detected, revoking family');
       clearRefreshCookie(reply);
-      return reply.code(403).send({ error: 'FORBIDDEN' });
+      return reply.code(401).send({ error: 'UNAUTHORIZED' });
     }
 
     const accessToken = signAccessToken({
