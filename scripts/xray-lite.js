@@ -793,3 +793,31 @@ function extractZodEnvKeys(src){
   write('XRAY_FULL.md', lines.join('\n').replace(/\n{3,}/g,'\n\n'));
 })();
 
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
+
+(async () => {
+  const xrayFullPath = path.join(OUTDIR, 'XRAY_FULL.md');
+  if (!exists(xrayFullPath)) return;
+
+  try {
+    const command = `npx -y markdown-toc -i ${JSON.stringify(xrayFullPath)}`;
+    const { stdout, stderr } = await execAsync(command, {
+      cwd: ROOT,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    if (stdout && stdout.trim()) process.stdout.write(stdout);
+    if (stderr && stderr.trim()) process.stderr.write(stderr);
+
+    const formatted = fs
+      .readFileSync(xrayFullPath, 'utf8')
+      .replace(/\n{3,}/g, '\n\n')
+      .trimEnd()
+      .concat('\n');
+    fs.writeFileSync(xrayFullPath, formatted, 'utf8');
+    console.log('✔ markdown-toc enriched XRAY_FULL.md');
+  } catch (error) {
+    console.error('⚠️ markdown-toc failed', error.message);
+  }
+})();
