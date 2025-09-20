@@ -48,6 +48,11 @@ cp .env.example .env
 
 With a clean database, run the following in order: `docker compose up -d`, `npx prisma migrate deploy`, `npm run seed`, `npm run dev`.
 
+### Diagnostics
+
+- `npm run doctor`
+- `npm run xray`
+
 ### Developer runbook
 
 1. **Boot MySQL only (optional)** – If you prefer to run the API locally rather than in Docker, use `docker compose up -d db` (or point `DATABASE_URL` to your own MySQL 8 instance). The compose file loads shared values from `.env` and defaults to `zomzom`/`zomzompass` (user) with `root`/`rootpass` for the root account so the example `DATABASE_URL` works out of the box. When developing migrations locally, also create an empty shadow database and expose it through `SHADOW_DATABASE_URL`.
